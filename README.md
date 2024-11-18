@@ -104,7 +104,7 @@ List<ProductDetails> _products = [];
 Future<void> _initializeInAppPurchase() async {
   _available = await _iap.isAvailable();
   if (_available) {
-    const Set<String> _kIds = <String>{'oneMonthSubscriptionTwo'};
+    const Set<String> _kIds = <String>{'{{your_iap_subscription_sku}}'}; // Replace with your IAP subscription SKUs
     final ProductDetailsResponse response = await _iap.queryProductDetails(_kIds);
     if (response.notFoundIDs.isNotEmpty) {
       print("Product not found: ${response.notFoundIDs}");

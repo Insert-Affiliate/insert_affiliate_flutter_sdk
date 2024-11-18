@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+// ignore: depend_on_referenced_packages
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart'; 
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'dart:io'; // For platform detection
 
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final List<String> iapSkus;
@@ -58,8 +60,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     _subscription = purchaseUpdates.listen((purchases) async {
       for (var purchase in purchases) {
         if (purchase.status == PurchaseStatus.purchased && !processedPurchases.contains(purchase.purchaseID)) {
-          _logPurchaseComplete(purchase);
-
           handlePurchaseValidation(purchase);
 
           // Mark this purchase as processed
@@ -68,14 +68,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         }
       }
     });
-  }
-
-  // Log purchase completion
-  void _logPurchaseComplete(PurchaseDetails purchase) async {
-    print("[Insert Affiliate] New purchase complete: ${purchase.productID}");
-    final prefs = await SharedPreferences.getInstance();
-
-    print("[Insert Affiliate] retrieveInsertAffiliateLink: ${retrieveInsertAffiliateLink()}");
   }
 
   // Dispose the subscription to avoid memory leaks
@@ -89,12 +81,15 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   void errorLog(String message, [String type = "log"]) {
     switch (type) {
       case "error":
+        // ignore: avoid_print
         print("[Insert Affiliate] ERROR: $message"); // Using high level for errors
         break;
       case "warn":
+        // ignore: avoid_print
         print("[Insert Affiliate] WARN: $message");  // Medium level for warnings
         break;
       default:
+        // ignore: avoid_print
         print("[Insert Affiliate] LOG: $message");
         break;
     }
@@ -105,21 +100,34 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       final receiptData = await SKReceiptManager.retrieveReceiptData();
       var applicationUsername = await retrieveInsertAffiliateLink();
 
-      print("[Insert Affiliate] Application username on handlePurchaseValidation: $applicationUsername");
+      // Platform-specific transaction details
+      Map<String, dynamic> transactionDetails;
 
-      if (receiptData == null) {
-        errorLog("[Insert Affiliate] Receipt data is empty. Ensure purchases are processed correctly.", "error");
-        throw Exception('Receipt data is empty. Ensure purchases are processed correctly.');
-      }
-
-      final requestBody = {
-        'id': iapticAppId,
-        'type': 'application',
-        'transaction': {
+      if (Platform.isIOS) {
+        // iOS-specific transaction details
+        transactionDetails = {
           'id': iapticAppId,
           'type': 'ios-appstore',
           'appStoreReceipt': receiptData,
-        },
+        };
+      } else if (Platform.isAndroid) {
+        // Android-specific transaction details
+        transactionDetails = {
+          'id': purchaseDetails.purchaseID ?? '',
+          'type': 'android-playstore',
+          'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
+          'receipt': purchaseDetails.verificationData.serverVerificationData,
+          'signature': purchaseDetails.verificationData.localVerificationData,
+        };
+      } else {
+        throw UnsupportedError("Unsupported platform");
+      }
+
+      // Construct the request body
+      final requestBody = {
+        'id': iapticAppId,
+        'type': 'application',
+        'transaction': transactionDetails,
       };
 
       if (applicationUsername != null) {
@@ -138,9 +146,10 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        print(response.body);
+        // ignore: avoid_print
         print("[Insert Affiliate] Validation successful");
       } else {
+        // ignore: avoid_print
         print("[Insert Affiliate] Validation failed: ${response.body}");
         errorLog("Validation failed: ${response.body}", "error");
       }

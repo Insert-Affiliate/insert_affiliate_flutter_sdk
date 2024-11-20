@@ -157,4 +157,43 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       errorLog("handlePurchaseValidation: $error", "error");
     }
   }
+
+  Future<void> trackEvent({required String eventName}) async {
+    try {
+      final affiliateLink = await retrieveInsertAffiliateLink();
+
+      if (affiliateLink == null) {
+        errorLog(
+          "[Insert Affiliate] No affiliate link found. Please save one before tracking events.",
+          "warn",
+        );
+        return;
+      }
+
+      final payload = {
+        "eventName": eventName,
+        "deepLinkParam": affiliateLink,
+      };
+
+      final response = await http.post(
+        Uri.parse('https://api.insertaffiliate.com/v1/trackEvent'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        // ignore: avoid_print
+        print("[Insert Affiliate] Event tracked successfully");
+      } else {
+        errorLog(
+          "[Insert Affiliate] Failed to track event. Status code: ${response.statusCode}, Response: ${response.body}",
+          "error",
+        );
+      }
+    } catch (error) {
+      errorLog("[Insert Affiliate] Error tracking event: $error", "error");
+    }
+  }
 }

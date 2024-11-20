@@ -131,3 +131,22 @@ void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
 }
 ```
 
+## Event Tracking (Beta)
+
+The **InsertAffiliateFlutter SDK** includes a beta feature for event tracking, allowing you to track specific user actions within your app. Please note that this feature is currently in beta, and while we aim to secure its functionality, we cannot guarantee that it is fully resistant to tampering or manipulation at this stage.
+
+### Using `trackEvent`
+
+To track an event, use the `trackEvent` function provided by the SDK. Make sure you open an affiliate's deep link before tracking the event; otherwise, event tracking will not work. Here’s an example:
+
+```dart
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+ElevatedButton(
+  onPressed: () {
+    insertAffiliateSdk.trackEvent(eventName: "yourEventIdentifier")
+      .then((_) => print('Event tracked successfully!'))
+      .catchError((error) => print('Error tracking event: $error'));
+  },
+  child: Text("Track Test Event"),
+);

@@ -67,7 +67,7 @@ void main() async {
 ```
 
 ### Step 4: Set Up Your Deep Linking SDK for Referrer Links
-In the example below, we demonstrate using Branch.io. This logic is compatible with any deep linking platform that provides the clicked link—simply call `insertAffiliateSdk.saveInsertAffiliateLink(...)` and pass the link as an argument.
+In the example below, we demonstrate using Branch.io. This logic is compatible with any deep linking platform that provides the clicked link—simply call `insertAffiliateSdk.storeInsertAffiliateIdentifier(...)` and pass the link as an argument.
 
 ```dart
 late StreamSubscription<Map> _branchStreamSubscription;
@@ -78,7 +78,7 @@ void initState() {
 
   _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
     if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
-      insertAffiliateSdk.saveInsertAffiliateLink(data["~referring_link"]);
+      insertAffiliateSdk.storeInsertAffiliateIdentifier(data["~referring_link"]);
     }
   }, onError: (error) {
     print('Branch session error: ${error.toString()}');
@@ -124,7 +124,7 @@ void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
   for (var purchaseDetails in purchaseDetailsList) {
     if (purchaseDetails.status == PurchaseStatus.purchased) {
       // Validate purchase with Insert Affiliate SDK
-      insertAffiliateSdk.handlePurchaseValidation(purchaseDetails);
+      insertAffiliateSdk.validatePurchaseWithIapticAPI(purchaseDetails);
     }
     InAppPurchase.instance.completePurchase(purchaseDetails);
   }

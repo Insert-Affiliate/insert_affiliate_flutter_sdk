@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-// ignore: depend_on_referenced_packages
-import 'package:in_app_purchase_storekit/store_kit_wrappers.dart'; 
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -10,46 +7,17 @@ import 'dart:math';
 import 'dart:io'; // For platform detection
 
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
-  final List<String> iapSkus;// TODO: move out of app init, not required here probably
   final String companyCode;
-  final String iapticAppId;// TODO: move out of app init, not required here probably
-  final String iapticAppName;// TODO: move out of app init, not required here probably
-  final String iapticPublicKey;// TODO: move out of app init, not required here probably
-
-  StreamSubscription<List<PurchaseDetails>>? _subscription;
 
   InsertAffiliateFlutterSDK({
-    required this.iapSkus,// TODO: move out of app init, not required here probably
     required this.companyCode,
-    required this.iapticAppId, // TODO: move out of app init, not required here probably
-    required this.iapticAppName,// TODO: move out of app init, not required here probably
-    required this.iapticPublicKey,// TODO: move out of app init, not required here probably
   }) {
     _init();
   }
 
-  // TODO: Michael - move the purchases part of the init into the demo app and out of the SDK!
   void _init() async {
-    print("_init");
-    final purchaseUpdates = InAppPurchase.instance.purchaseStream;
     final prefs = await SharedPreferences.getInstance();
-
     _storeAndReturnShortUniqueDeviceId();
-
-    // Load the list of processed purchase IDs
-    Set<String> processedPurchases = prefs.getStringList('processedPurchases')?.toSet() ?? {};
-
-    _subscription = purchaseUpdates.listen((purchases) async {
-      for (var purchase in purchases) {
-        if (purchase.status == PurchaseStatus.purchased && !processedPurchases.contains(purchase.purchaseID)) {
-          validatePurchaseWithIapticAPI(purchase);
-
-          // Mark this purchase as processed
-          processedPurchases.add(purchase.purchaseID ?? "");
-          await prefs.setStringList('processedPurchases', processedPurchases.toList());
-        }
-      }
-    });
   }
 
   // MARK: Company Code
@@ -59,11 +27,10 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   // MARK: Short Codes
   bool isShortCode(String link) {
-    return link != null && RegExp(r'^[a-zA-Z0-9]{10}$').hasMatch(link);
+    return RegExp(r'^[a-zA-Z0-9]{10}$').hasMatch(link);
   }
 
   Future<void> setShortCode(String shortCode) async {
-    print("setShortCode: $shortCode");
     if (shortCode.isEmpty) {
       errorLog("Short code cannot be empty", "warn");
       return;
@@ -89,7 +56,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   Future<String> _storeAndReturnShortUniqueDeviceId() async {
-    print("_storeAndReturnShortUniqueDeviceId");
     final prefs = await SharedPreferences.getInstance();
     final existingUserId = prefs.getString('shortUniqueDeviceID');
     if (existingUserId != null) {
@@ -102,14 +68,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   // MARK: Setting Insert Affiliate Link
   Future<void> setInsertAffiliateIdentifier(String referringLink) async {
-    print("setInsertAffiliateIdentifier: $referringLink");
     if (companyCode.isEmpty) {
       errorLog("Company code cannot be empty", "warn");
       return;
     }
 
     if (isShortCode(referringLink)) {
-      print("setInsertAffiliateIdentifier isShortCode - $referringLink");
       await _storeInsertAffiliateReferringLink(referringLink);
       return;
     }
@@ -130,7 +94,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         final shortLink = jsonResponse['shortLink'];
 
         if (shortLink != null && shortLink.isNotEmpty) {
-          print("setInsertAffiliateIdentifier shortLink - $shortLink");
           await _storeInsertAffiliateReferringLink(shortLink);
           return;
         } else { // If theres an issue, store what was passed to save for later potential processing/recovery
@@ -145,14 +108,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   Future<void> _storeInsertAffiliateReferringLink(String referringLink) async {
-    print("_storeInsertAffiliateReferringLink: $referringLink");    
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('referring_link', referringLink);
     notifyListeners();
   }
 
   Future<String?> returnInsertAffiliateIdentifier() async {
-    print("returnInsertAffiliateIdentifier");
     final prefs = await SharedPreferences.getInstance();
     final referringLink = prefs.getString('referring_link');
     final shortUniqueDeviceID = prefs.getString('shortUniqueDeviceID');
@@ -164,7 +125,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   // MARK: Event Tracking
   Future<void> trackEvent({required String eventName}) async {
-    print("trackEvent: $eventName");
     try {
       final affiliateLink = await returnInsertAffiliateIdentifier();
 
@@ -191,7 +151,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         // ignore: avoid_print
-        print("[Insert Affiliate] Event tracked successfully");
       } else {
         errorLog(
           "[Insert Affiliate] Failed to track event. Status code: ${response.statusCode}, Response: ${response.body}",
@@ -206,7 +165,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // Dispose the subscription to avoid memory leaks
   @override
   void dispose() {
-    _subscription?.cancel();
     super.dispose();
   }
 
@@ -228,49 +186,57 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
-  // MARK: Validate with Iaptic API
-  Future<void> validatePurchaseWithIapticAPI(PurchaseDetails purchaseDetails) async {
-    print("validatePurchaseWithIapticAPI");
+  Future<bool> validatePurchaseWithIapticAPI(
+    Map<String, dynamic> jsonIapPurchase,
+    String iapticAppId,
+    String iapticAppName,
+    String iapticPublicKey
+  ) async {
     try {
-      final receiptData = await SKReceiptManager.retrieveReceiptData();
-      var applicationUsername = await returnInsertAffiliateIdentifier();
+      // Step 1: Base request body
+      final Map<String, dynamic> baseRequestBody = {
+        'id': iapticAppId,
+        'type': 'application',
+      };
 
-      // Platform-specific transaction details
-      Map<String, dynamic> transactionDetails;
+      // Step 2: Construct platform-specific transaction details
+      Map<String, dynamic> transaction;
 
       if (Platform.isIOS) {
-        // iOS-specific transaction details
-        transactionDetails = {
+        transaction = {
           'id': iapticAppId,
           'type': 'ios-appstore',
-          'appStoreReceipt': receiptData,
+          'appStoreReceipt': jsonIapPurchase['transactionReceipt'],
         };
       } else if (Platform.isAndroid) {
-        // Android-specific transaction details
-        transactionDetails = {
-          'id': purchaseDetails.purchaseID ?? '',
+        // Decode Android receipt
+        final receiptJson = jsonDecode(utf8.decode(base64.decode(jsonIapPurchase['transactionReceipt'] ?? "")));
+        transaction = {
+          'id': receiptJson['orderId'], // Extracted orderId
           'type': 'android-playstore',
-          'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
-          'receipt': purchaseDetails.verificationData.serverVerificationData,
-          'signature': purchaseDetails.verificationData.localVerificationData,
+          'purchaseToken': receiptJson['purchaseToken'], // Extracted purchase token
+          'receipt': jsonIapPurchase['transactionReceipt'], // Full receipt (Base64)
+          'signature': receiptJson['signature'], // Receipt signature
         };
       } else {
         throw UnsupportedError("Unsupported platform");
       }
 
-      // Construct the request body
-      final requestBody = {
-        'id': iapticAppId,
-        'type': 'application',
-        'transaction': transactionDetails,
+      // Step 3: Build the full request body
+      final Map<String, dynamic> requestBody = {
+        ...baseRequestBody,
+        'transaction': transaction,
       };
 
-      if (applicationUsername != null) {
+      // Step 4: Add additional data if available
+      final String? insertAffiliateApplicationUsername = await returnInsertAffiliateIdentifier();
+      if (insertAffiliateApplicationUsername != null) {
         requestBody['additionalData'] = {
-          'applicationUsername': applicationUsername,
+          'applicationUsername': '$insertAffiliateApplicationUsername',
         };
       }
 
+      // Step 5: Send validation request to the server
       final response = await http.post(
         Uri.parse('https://validator.iaptic.com/v1/validate'),
         headers: {
@@ -280,16 +246,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         body: jsonEncode(requestBody),
       );
 
+      // Step 6: Handle server response
       if (response.statusCode == 200) {
-        // ignore: avoid_print
-        print("[Insert Affiliate] Validation successful");
+        return true;
       } else {
-        // ignore: avoid_print
-        print("[Insert Affiliate] Validation failed: ${response.body}");
-        errorLog("Validation failed: ${response.body}", "error");
+        return false;
       }
     } catch (error) {
-      errorLog("validatePurchaseWithIapticAPI: $error", "error");
+      return false;
     }
   }
 }

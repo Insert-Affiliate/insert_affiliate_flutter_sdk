@@ -16,7 +16,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   void _init() async {
-    final prefs = await SharedPreferences.getInstance();
     _storeAndReturnShortUniqueDeviceId();
   }
 

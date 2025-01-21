@@ -14,5 +14,5 @@ dart pub publish --dry-run
 - Publish to pub.dev
 dart pub publish
 
-- Result visible at  https://pub.dev/packages/insert_affiliate_flutter_sdk
+- Result visible at https://pub.dev/packages/insert_affiliate_flutter_sdk
 

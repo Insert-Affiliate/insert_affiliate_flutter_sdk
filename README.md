@@ -153,7 +153,7 @@ Next, you must setup a webhook to allow us to communicate directly with RevenueC
 First, complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup. Then modify your ```main.dart``` file:
 
 
-```
+```dart
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 

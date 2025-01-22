@@ -16,6 +16,8 @@ To get started with the Insert Affiliate Flutter SDK:
 1. [Install the SDK via pubspec.yaml](#installation)
 2. [Initialise the SDK in your Main Dart File](#basic-usage)
 3. [Set up in-app purchases (Required)](#in-app-purchase-setup-required)
+4. [Set up deep linking (Required)](#deep-link-setup-required)
+5. [Use additional features like event tracking based on your app's requirements.](#additional-features)
 
 ## Installation
 
@@ -76,27 +78,76 @@ Insert Affiliate requires a Receipt Verification platform to validate in-app pur
 
 ### Option 1: RevenueCat Integration
 
-COMING SOON
+#### Code Setup
+1. **Install RevenueCat SDK** - First, follow the [RevenueCat SDK installation](https://www.revenuecat.com/docs/getting-started/installation/flutter) to set up in-app purchases and subscriptions.
 
-<!--#### 1. Code Setup-->
-<!--First, complete the [RevenueCat SDK installation](https://www.revenuecat.com/docs/getting-started/installation/flutter)-->
+2. **Modify Initialisation Code** - Update the file where you initialise your deep linking (e.g., Branch.io) and RevenueCat to include a call to ```insertAffiliateSdk.returnInsertAffiliateIdentifier()```. This ensures that the Insert Affiliate identifier is passed to RevenueCat every time the app starts or a deep link is clicked.
 
-<!--#### 2. Webhook Setup-->
+3. **Implementation Example**
 
-<!--1. Go to RevenueCat and [create a new webhook](https://www.revenuecat.com/docs/integrations/webhooks)-->
+```dart
+import 'dart:async';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
-<!--2. Configure the webhook with these settings:-->
-<!--   - Webhook URL: `https://api.insertaffiliate.com/v1/api/revenuecat-webhook`-->
-<!--   - Authorization header: Use the value from your Insert Affiliate dashboard (you'll get this in step 4)-->
+class _MyAppState extends State<MyApp> {
+    @override
+    void initState() {
+        super.initState();
+        _initializeAsyncDependencies();
+    }
+    
+    
+    Future<void> _initializeAsyncDependencies() async {
+        // Step 1: Initialize RevenueCat
+        await _initializeRevenueCat();
+        
+        // Step 2: Handle initial affiliate identifier
+        handleAffiliateIdentifier();
+        
+        // Step 3: Listen for deep links (Branch.io example)
+        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
+            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
+                final referringLink = data["~referring_link"];
+                insertAffiliateSdk.setInsertAffiliateIdentifier(referringLink);
+                
+                // Handle affiliate identifier after deep link click
+                handleAffiliateIdentifier();
+            }
+        }, onError: (error) {
+            print('listSession error: ${error.toString()}');
+        });
+    }
+    
+    void handleAffiliateIdentifier() {
+        insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+            if (value != null && value.isNotEmpty) {
+                Purchases.logIn(affiliateId); // Log in to RevenueCat with affiliate ID
+            }
+        });
+    }
+}
 
-<!--3. In your [Insert Affiliate dashboard settings](https://app.insertaffiliate.com/settings):-->
-<!--   - Navigate to the verification settings-->
-<!--   - Set the in-app purchase verification method to `RevenueCat`-->
+```
 
-<!--4. Back in your Insert Affiliate dashboard:-->
-<!--   - Locate the `RevenueCat Webhook Authentication Header` value-->
-<!--   - Copy this value-->
-<!--   - Paste it as the Authorization header value in your RevenueCat webhook configuration-->
+#### Webhook Setup
+
+Next, you must setup a webhook to allow us to communicate directly with RevenueCat to track affiliate purchases.
+
+1. Go to RevenueCat and [create a new webhook](https://www.revenuecat.com/docs/integrations/webhooks)
+
+2. Configure the webhook with these settings:
+   - Webhook URL: `https://api.insertaffiliate.com/v1/api/revenuecat-webhook`
+   - Authorization header: Use the value from your Insert Affiliate dashboard (you'll get this in step 4)
+
+3. In your [Insert Affiliate dashboard settings](https://app.insertaffiliate.com/settings):
+   - Navigate to the verification settings
+   - Set the in-app purchase verification method to `RevenueCat`
+
+4. Back in your Insert Affiliate dashboard:
+   - Locate the `RevenueCat Webhook Authentication Header` value
+   - Copy this value
+   - Paste it as the Authorization header value in your RevenueCat webhook configuration
 
 ### Option 2: Iaptic Integration
 First, complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup. Then modify your ```main.dart``` file:

@@ -281,22 +281,3 @@ late final InsertAffiliateFlutterSDK insertAffiliateSdk;
 
 insertAffiliateSdk.setShortCode("B2SC6VRSKQ")
 ```
-
-#### Example Integration
-Below is an example SwiftUI implementation where users can enter a short code, which will be validated and associated with the affiliate's account:
-
-```dart
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-ElevatedButton(
-    onPressed: () => insertAffiliateSdk.setShortCode("B2SC6VRSKQ"),
-    child: Text("Set Short Code"),
-)
-```
-
-#### Example Usage
-Set the Affiliate Identifier (required for tracking):
-
-```swift
-InsertAffiliateSwift.setInsertAffiliateIdentifier(referringLink: "your_affiliate_link")
-```

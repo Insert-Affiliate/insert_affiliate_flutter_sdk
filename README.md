@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Insert Affiliate Flutter SDK** is designed for Flutter applications, providing seamless integration with the [Insert Affiliate platform](https://insertaffiliate.com).The Insert Affiliate Flutter SDK simplifies affiliate marketing for iOS apps with in-app-purchases, allowing developers to create a seamless user experience for affiliate tracking and monetisation.
+The **Insert Affiliate Flutter SDK** is designed for Flutter applications, providing seamless integration with the [Insert Affiliate platform](https://insertaffiliate.com). This SDK simplifies affiliate marketing for iOS apps with in-app-purchases, allowing developers to create a seamless user experience for affiliate tracking and monetisation.
 
 ### Features
 
@@ -19,6 +19,7 @@ To get started with the Insert Affiliate Flutter SDK:
 4. [Set up deep linking (Required)](#deep-link-setup-required)
 5. [Use additional features like event tracking based on your app's requirements.](#additional-features)
 
+
 ## Installation
 
 Include the following dependencies in your pubspec.yaml file:
@@ -33,7 +34,6 @@ dependencies:
 ```
 
 Run ```$ flutter pub get``` in your terminal from the project root to fetch the required packages.
-
 
 
 ## Basic Usage
@@ -153,7 +153,7 @@ Next, you must setup a webhook to allow us to communicate directly with RevenueC
 First, complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup. Then modify your ```main.dart``` file:
 
 
-```dart
+```
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
@@ -242,7 +242,7 @@ class _MyAppState extends State<MyApp> {
 
 ### 1. Event Tracking (Beta)
 
-The **InsertAffiliateFlutter SDK** now includes a beta feature for event tracking. Use event tracking to log key user actions such as signups, purchases, or referrals. This is useful for:§
+The **InsertAffiliateFlutter SDK** now includes a beta feature for event tracking. Use event tracking to log key user actions such as signups, purchases, or referrals. This is useful for:
 - Understanding user behaviour.
 - Measuring the effectiveness of marketing campaigns.
 - Incentivising affiliates for designated actions being taken by the end users, rather than just in app purchases (i.e. pay an affilaite for each signup).
@@ -280,4 +280,33 @@ For more information, visit the [Insert Affiliate Short Codes Documentation](htt
 late final InsertAffiliateFlutterSDK insertAffiliateSdk;
 
 insertAffiliateSdk.setShortCode("B2SC6VRSKQ")
+```
+
+### Setting a Short Code
+
+Use the `setShortCode` method to associate a short code with an affiliate. This is ideal for scenarios where users enter the code via an input field, pop-up, or similar UI element.
+
+Short codes must meet the following criteria:
+- Exactly **10 characters long**.
+- Contain only **letters and numbers** (alphanumeric characters).
+- Replace {{ user_entered_short_code }} with the short code the user enters through your chosen input method, i.e. an input field / pop up element
+
+
+#### Example Integration
+Below is an example SwiftUI implementation where users can enter a short code, which will be validated and associated with the affiliate's account:
+
+```dart
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+ElevatedButton(
+    onPressed: () => insertAffiliateSdk.setShortCode("B2SC6VRSKQ"),
+    child: Text("Set Short Code"),
+)
+```
+
+#### Example Usage
+Set the Affiliate Identifier (required for tracking):
+
+```swift
+InsertAffiliateSwift.setInsertAffiliateIdentifier(referringLink: "your_affiliate_link")
 ```

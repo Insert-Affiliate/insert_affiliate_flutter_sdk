@@ -1,3 +1,6 @@
+## 1.0.3
+Updating guide and ReadMe.md
+
 ## 1.0.2
 Release of Short Codes
 

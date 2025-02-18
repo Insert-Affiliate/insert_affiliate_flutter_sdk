@@ -153,7 +153,7 @@ Next, you must setup a webhook to allow us to communicate directly with RevenueC
 First, complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup. Then modify your ```main.dart``` file:
 
 
-```
+```dart
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
@@ -201,16 +201,23 @@ Replace the following:
 - `{{ your_iaptic_public_key }}` with your [Iaptic Public Key](https://www.iaptic.com/settings)
 
 ## Deep Link Setup [Required]
+Insert Affiliate requires a Deep Linking platform to create links for your affiliates. Our platform works with **any** deep linking provider, and you only need to follow these steps:
+1. **Create a deep link** in your chosen third-party platform and pass it to our dashboard when an affiliate signs up. 
+2. **Handle deep link clicks** in your app by passing the clicked link:
+   ```flutter
+   insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
+   ```
 
-### Step 1: Add the Deep Linking Platform Dependency
+### Deep Linking with Branch.io
+To set up deep linking with Branch.io, follow these steps:
 
-In this example, the deep linking functionality is implemented using [Branch.io](https://dashboard.branch.io/).
+1. Create a deep link in Branch and pass it to our dashboard when an affiliate signs up.
+    - Example: [Branch Deep Link Setup](https://docs.insertaffiliate.com/branch-create-affiliate).
+2. Modify Your Deep Link Handling in `Main.dart`
+    - After setting up your Branch integration, add the following code to initialise the Insert Affiliate SDK in your iOS app:
 
-Any alternative deep linking platform can be used by passing the referring link to ```insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);``` as in the below Branch.io example
+#### Modify Your Deep Link listSession Listener function in `Main.dart`
 
-### Step 2: Modify Your Deep Link listSession Listener function in `Main.dart`
-
-After setting up your Branch integration, add the following code to initialise the Insert Affiliate Flutter SDK.
 
 ```dart
 import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
@@ -228,7 +235,7 @@ class _MyAppState extends State<MyApp> {
         
         _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
             if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
-                insertAffiliateSdk.storeInsertAffiliateIdentifier(data["~referring_link"]);
+                insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
             }
         }, onError: (error) {
             print('Branch session error: ${error.toString()}');
@@ -261,7 +268,7 @@ ElevatedButton(
     insertAffiliateSdk.trackEvent(eventName: "yourEventIdentifier")
       .then((_) => print('Event tracked successfully!'))
       .catchError((error) => print('Error tracking event: $error'));
-  },
+  },d
   child: Text("Track Test Event"),
 );
 ```

@@ -122,7 +122,7 @@ class _MyAppState extends State<MyApp> {
     void handleAffiliateIdentifier() {
         insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
             if (value != null && value.isNotEmpty) {
-                Purchases.logIn(affiliateId); // Log in to RevenueCat with affiliate ID
+                Purchases.logIn(value); // Log in to RevenueCat with affiliate ID
             }
         });
     }

@@ -57,15 +57,17 @@ import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 late final InsertAffiliateFlutterSDK insertAffiliateSdk;
 
 void main() async {
-  // Ensure Flutter is initialized before running any async code
-  WidgetsFlutterBinding.ensureInitialized();
+    // Ensure Flutter is initialized before running any async code
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialise Insert Affiliate SDK
-  insertAffiliateSdk = InsertAffiliateFlutterSDK(
-    companyCode: "{{ your_company_code }}",
-  );
+    // Important: Your Deep Linking Platform (i.e. Branch.io) and receipt verification platform if using a third party like RevenueCat / Iaptic, must be initialised before the Insert Affiliate SDK.
 
-  runApp(MyApp());
+    // Initialise Insert Affiliate SDK
+    insertAffiliateSdk = InsertAffiliateFlutterSDK(
+        companyCode: "{{ your_company_code }}",
+    );
+
+    runApp(MyApp());
 }
 ```
 - Replace `{{ your_company_code }}` with the unique company code associated with your Insert Affiliate account. You can find this code in your dashboard under [Settings](http://app.insertaffiliate.com/settings).
@@ -122,7 +124,7 @@ class _MyAppState extends State<MyApp> {
     void handleAffiliateIdentifier() {
         insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
             if (value != null && value.isNotEmpty) {
-                Purchases.logIn(affiliateId); // Log in to RevenueCat with affiliate ID
+                Purchases.logIn(value); // Log in to RevenueCat with affiliate ID
             }
         });
     }
@@ -212,7 +214,7 @@ Insert Affiliate requires a Deep Linking platform to create links for your affil
 To set up deep linking with Branch.io, follow these steps:
 
 1. Create a deep link in Branch and pass it to our dashboard when an affiliate signs up.
-    - Example: [Branch Deep Link Setup](https://docs.insertaffiliate.com/branch-create-affiliate).
+    - Example: [Create Affiliate](https://docs.insertaffiliate.com/create-affiliate).
 2. Modify Your Deep Link Handling in `Main.dart`
     - After setting up your Branch integration, add the following code to initialise the Insert Affiliate SDK in your iOS app:
 

@@ -1,3 +1,6 @@
+## 1.0.5
+Update ReadMe for RevCat Change
+
 ## 1.0.4
 Updating ReadMe.Md to fix broken links
 

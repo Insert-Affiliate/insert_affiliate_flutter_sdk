@@ -77,6 +77,8 @@ void main() async {
 Insert Affiliate requires a Receipt Verification platform to validate in-app purchases. You must choose **one** of our supported partners:
 - [RevenueCat](https://www.revenuecat.com/)
 - [Iaptic](https://www.iaptic.com/account)
+- [App Store Direct Integration](#app-store-direct-integration)
+- [Google Play Store Direct Integration](#google-play-store-direct-integration)
 
 ### Option 1: RevenueCat Integration
 
@@ -141,6 +143,7 @@ Next, you must setup a webhook to allow us to communicate directly with RevenueC
 2. Configure the webhook with these settings:
    - Webhook URL: `https://api.insertaffiliate.com/v1/api/revenuecat-webhook`
    - Authorization header: Use the value from your Insert Affiliate dashboard (you'll get this in step 4)
+   - Set "Event Type" to "All events"
 
 3. In your [Insert Affiliate dashboard settings](https://app.insertaffiliate.com/settings):
    - Navigate to the verification settings
@@ -201,6 +204,90 @@ Replace the following:
 - `{{ your_iaptic_app_id }}` with your [Iaptic App ID](https://www.iaptic.com/account)
 - `{{ your_iaptic_app_name }}` with your [Iaptic App Name](https://www.iaptic.com/account)
 - `{{ your_iaptic_public_key }}` with your [Iaptic Public Key](https://www.iaptic.com/settings)
+
+### Option 3: App Store Direct Integration
+
+Our direct App Store integration is currently in beta and currently supports subscriptions only. **Consumables and one-off purchases are not yet supported** due to App Store server-to-server notification limitations.
+
+We plan to release support for consumables and one-off purchases soon. In the meantime, you can use a receipt verification platform from the other integration options.
+
+#### Apple App Store Notification Setup
+To proceed, visit [our docs](https://docs.insertaffiliate.com/direct-store-purchase-integration#1-apple-app-store-server-notifications) and complete the required setup steps to set up App Store Server to Server Notifications.
+
+#### Implementing Purchases
+
+##### 1. Import Required Modules  
+
+Ensure you import the necessary dependencies, including `Platform` and `useDeepLinkIapProvider` from the SDK.  
+
+```dart
+import 'dart:io';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+```
+
+##### 2. Handle the Purchase
+When a user taps your purchase button, retrieve the appAccountToken using the Insert Affiliate SDK (iOS only), then pass it to the PurchaseParam when initiating the subscription. This links the purchase to the user account for affiliate tracking.
+
+```dart
+void _buySubscription(ProductDetails product) async {
+    String? appAccountToken;
+    if (Platform.isIOS) {
+        appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction();
+    }
+    
+    final purchaseParam = PurchaseParam(
+        productDetails: product,
+        applicationUserName: appAccountToken, // Will be null on Android and if null if no Insert Affiliate identifier is set from the user entering a short code or clicking an affiliate's link
+    );
+
+    _iap.buyNonConsumable(purchaseParam: purchaseParam);
+}
+```
+
+### Option 4: Google Play Store Direct Integration
+We now support direct Google Play Store integration (currently in beta). This enables real-time purchase tracking via Google Play’s Real-Time Developer Notifications (RTDN).
+
+
+#### Real Time Developer Notifications (RTDN) Setup
+
+Visit [our docs](https://docs.insertaffiliate.com/direct-google-play-store-purchase-integration) and complete the required set up steps for Google Play's Real Time Developer Notifications.
+
+#### Implementing Purchases
+
+##### 1. Import Required Modules  
+
+
+```dart
+import 'dart:io';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+```
+
+##### 2. Handle the Purchase
+Inside your purchase stream listener, ensure you track Android purchases by storing the purchaseToken:
+
+```dart
+void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
+    for (var purchaseDetails in purchaseDetailsList) {
+        if (_processedPurchases.contains(purchaseDetails.purchaseID)) return;
+
+        if (purchaseDetails.status == PurchaseStatus.purchased) {
+            if (Platform.isAndroid && purchaseDetails is GooglePlayPurchaseDetails) {
+                final purchaseToken = purchaseDetails.billingClientPurchase.purchaseToken;
+
+                if (purchaseToken.isNotEmpty) {
+                    await insertAffiliateSdk.storeExpectedStoreTransaction(purchaseToken);
+                }
+            }
+            _processedPurchases.add(purchaseDetails.purchaseID ?? "");
+            InAppPurchase.instance.completePurchase(purchaseDetails);
+        }
+    }
+}  
+```
+
 
 ## Deep Link Setup [Required]
 Insert Affiliate requires a Deep Linking platform to create links for your affiliates. Our platform works with **any** deep linking provider, and you only need to follow these steps:

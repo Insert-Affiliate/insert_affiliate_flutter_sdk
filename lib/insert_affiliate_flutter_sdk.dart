@@ -122,6 +122,109 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     return "$referringLink-${shortUniqueDeviceID}";
   }
 
+  Future<void> storeExpectedStoreTransaction(String purchaseToken) async {
+    try {
+      // 1. Ensure companyCode exists
+      if (companyCode.isEmpty) {
+        errorLog("[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.", "error");
+        return;
+      }
+
+      // 2. Retrieve shortCode (affiliate ID)
+      final shortCode = await returnInsertAffiliateIdentifier();
+      if (shortCode == null) {
+        errorLog("[Insert Affiliate] No affiliate identifier found. Please set one before tracking events.", "error");
+        return;
+      }
+
+      // 3. Build the JSON payload
+      final payload = {
+        'UUID': purchaseToken,
+        'companyCode': companyCode,
+        'shortCode': shortCode,
+        'storedDate': DateTime.now().toIso8601String(),
+      };
+
+      // 4. Send the request to the Insert Affiliate API
+      final response = await http.post(
+        Uri.parse("https://api.insertaffiliate.com/v1/api/app-store-webhook/create-expected-transaction"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      // 5. Handle response
+      if (response.statusCode == 200) {
+        print("[Insert Affiliate] Expected transaction stored successfully.");
+      } else {
+        print("[Insert Affiliate] Failed to store expected transaction. "
+          "Status code: ${response.statusCode}, Response: ${response.body}");
+      }
+    } catch (error) {
+      errorLog("[Insert Affiliate] Error storing expected transaction: $error", "error");
+    }
+  }
+
+  Future<String?> returnUserAccountTokenAndStoreExpectedTransaction() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Step 1: Get or create user account token
+      String? userAccountToken = prefs.getString('user_account_token');
+      if (userAccountToken == null) {
+        userAccountToken = _generateUUID();
+        await prefs.setString('user_account_token', userAccountToken);
+      }
+
+      // Step 2: Get insert affiliate identifier (referrer + user ID)
+      final shortCode = await returnInsertAffiliateIdentifier();
+      if (shortCode == null) {
+        errorLog("[Insert Affiliate] No affiliate stored - not saving expected transaction.");
+        return null;
+      }
+
+      // Step 3: Build payload
+      final payload = {
+        'UUID': userAccountToken,
+        'companyCode': companyCode,
+        'shortCode': shortCode,
+        'storedDate': DateTime.now().toIso8601String(),
+      };
+
+      // Step 4: Send to API
+      final response = await http.post(
+        Uri.parse("https://api.insertaffiliate.com/v1/api/app-store-webhook/create-expected-transaction"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        print("[Insert Affiliate] Expected transaction stored successfully.");
+        return userAccountToken;
+      } else {
+        print("[Insert Affiliate] Failed to store expected transaction. Status code: ${response.statusCode}, Body: ${response.body}");
+        return null;
+      }
+    } catch (error) {
+      errorLog("[Insert Affiliate] Error storing expected transaction: $error", "error");
+      return null;
+    }
+  }
+
+  String _generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replaceAllMapped(
+      RegExp(r'[xy]'),
+      (Match match) {
+        final r = Random().nextInt(16);
+        final v = match[0] == 'x' ? r : (r & 0x3) | 0x8;
+        return v.toRadixString(16);
+      },
+    );
+  }
+
   // MARK: Event Tracking
   Future<void> trackEvent({required String eventName}) async {
     try {

@@ -1,3 +1,6 @@
+## 1.0.6
+Adding direct app & play store integration
+
 ## 1.0.5
 Update ReadMe for RevCat Change
 

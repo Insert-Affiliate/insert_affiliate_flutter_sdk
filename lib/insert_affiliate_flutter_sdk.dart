@@ -228,6 +228,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Event Tracking
   Future<void> trackEvent({required String eventName}) async {
     try {
+      if (companyCode.isEmpty) {
+        errorLog("[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.", "error");
+        return;
+      }
+
       final affiliateLink = await returnInsertAffiliateIdentifier();
 
       if (affiliateLink == null) {
@@ -241,6 +246,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       final payload = {
         "eventName": eventName,
         "deepLinkParam": affiliateLink,
+        "companyId": companyCode,
       };
 
       final response = await http.post(

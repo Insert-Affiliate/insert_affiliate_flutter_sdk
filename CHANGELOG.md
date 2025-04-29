@@ -1,3 +1,6 @@
+## 1.0.8
+Updating Track Event to pass companyId
+
 ## 1.0.6
 Adding direct app & play store integration
 

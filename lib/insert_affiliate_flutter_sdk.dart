@@ -26,7 +26,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   // MARK: Short Codes
   bool isShortCode(String link) {
-    return RegExp(r'^[a-zA-Z0-9]{10}$').hasMatch(link);
+    return RegExp(r'^[a-zA-Z0-9]{3,25}$').hasMatch(link);
   }
 
   Future<void> setShortCode(String shortCode) async {
@@ -37,8 +37,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     shortCode = shortCode.toUpperCase();
 
-    if (shortCode.length != 10 || !RegExp(r'^[a-zA-Z0-9]{10}$').hasMatch(shortCode)) {
-      errorLog("Short code must be exactly 10 characters and contain only letters and numbers", "warn");
+    if (shortCode.length < 3 || shortCode.length > 25 || !RegExp(r'^[a-zA-Z0-9]{3,25}$').hasMatch(shortCode)) {
+      errorLog("Short code must be between 3-25 characters and contain only letters and numbers", "warn");
       return;
     }
 

@@ -1,3 +1,6 @@
+## 1.0.9
+Short Code 3-25 chars
+
 ## 1.0.8
 Updating Track Event to pass companyId
 

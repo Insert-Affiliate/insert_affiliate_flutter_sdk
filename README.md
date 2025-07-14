@@ -343,9 +343,8 @@ class _MyAppState extends State<MyApp> {
         }, onError: (error) {
             print('Branch session error: ${error.toString()}');
         });
-    }
+     }
 }
-
 ```
 
 ## Additional Features
@@ -414,9 +413,49 @@ ElevatedButton(
 )
 ```
 
-#### Example Usage
-Set the Affiliate Identifier (required for tracking):
+### 3. Offer Codes
 
-```swift
-InsertAffiliateSwift.setInsertAffiliateIdentifier(referringLink: "your_affiliate_link")
+Offer Codes allow you to automatically present a discount to users who access an affiliate’s link. This provides affiliates with a compelling incentive to promote your app, as discounts are automatically applied during the redemption flow [(learn more)](https://docs.insertaffiliate.com/offer-codes). 
+
+You’ll need your Offer Code URL ID, which can be created and retrieved from App Store Connect. Instructions to retrieve your Offer Code URL ID are available [here](https://docs.insertaffiliate.com/offer-codes#create-the-codes-within-app-store-connect).
+
+To fetch an Offer Code and conditionally redirect the user to redeem it, pass the deep link (from your Branch or other deep link provider) to:
+
+```dart
+insertAffiliateSdk.fetchAndConditionallyOpenUrl("your_affiliate_link", "your_offer_code_url_id");
+```
+
+#### Branch.io Example
+```dart
+import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+class _MyAppState extends State<MyApp> {
+    
+    late StreamSubscription<Map> _branchStreamSubscription;
+    
+    @override
+    void initState() {
+        super.initState();
+        
+        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
+            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
+                final referringLink = data["~referring_link"];
+                 insertAffiliateSdk.fetchAndConditionallyOpenUrl(
+                    data["~referring_link"],
+                    "{{ your_offer_code_url_id }}"
+                );
+
+                // Other code required for Insert Affiliate in the other listed steps...
+            }
+        }, onError: (error) {
+            print('Branch session error: ${error.toString()}');
+        });
+    }
+}
+
+```
+
 ```

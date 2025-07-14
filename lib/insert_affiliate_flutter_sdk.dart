@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'dart:io'; // For platform detection
+import 'package:url_launcher/url_launcher.dart';
 
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
@@ -268,6 +269,69 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     } catch (error) {
       errorLog("[Insert Affiliate] Error tracking event: $error", "error");
     }
+  }
+
+  // MARK: Offer Codes
+  Future<void> fetchAndConditionallyOpenUrl(String affiliateLink, String offerCodeUrlId) async {
+    try {
+      final offerCode = await fetchOfferCode(affiliateLink);
+      
+      if (offerCode != null && offerCode.isNotEmpty) {
+        await openRedeemURL(offerCode, offerCodeUrlId);
+      }
+    } catch (error) {
+      errorLog("Error fetching and opening offer code URL: $error", "error");
+    }
+  }
+
+  Future<String?> fetchOfferCode(String affiliateLink) async {
+    try {
+      final encodedAffiliateLink = Uri.encodeComponent(affiliateLink);
+      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$encodedAffiliateLink";
+      
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final offerCode = response.body;
+        
+        // Check for specific error strings from API
+        if (offerCode.contains("errorofferCodeNotFound") ||
+            offerCode.contains("errorAffiliateoffercodenotfoundinanycompany") ||
+            offerCode.contains("errorAffiliateoffercodenotfoundinanycompanyAffiliatelinkwas") ||
+            offerCode.contains("Routenotfound")) {
+          errorLog("Offer code not found or invalid: $offerCode", "warn");
+          return null;
+        }
+        
+        return _cleanOfferCode(offerCode);
+      } else {
+        errorLog("Failed to fetch offer code. Status code: ${response.statusCode}, Response: ${response.body}", "error");
+        return null;
+      }
+    } catch (error) {
+      errorLog("Error fetching offer code: $error", "error");
+      return null;
+    }
+  }
+
+  Future<void> openRedeemURL(String offerCode, String offerCodeUrlId) async {
+    try {
+      final redeemUrl = "https://apps.apple.com/redeem?ctx=offercodes&id=$offerCodeUrlId&code=$offerCode";
+      final uri = Uri.parse(redeemUrl);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        errorLog("Could not launch redeem URL: $redeemUrl", "error");
+      }
+    } catch (error) {
+      errorLog("Error opening redeem URL: $error", "error");
+    }
+  }
+
+  String _cleanOfferCode(String offerCode) {
+    // Remove special characters, keep only alphanumeric
+    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
   }
 
   // Dispose the subscription to avoid memory leaks

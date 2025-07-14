@@ -343,9 +343,8 @@ class _MyAppState extends State<MyApp> {
         }, onError: (error) {
             print('Branch session error: ${error.toString()}');
         });
-    }
+     }
 }
-
 ```
 
 ## Additional Features
@@ -414,9 +413,97 @@ ElevatedButton(
 )
 ```
 
-#### Example Usage
-Set the Affiliate Identifier (required for tracking):
+### 3. Offer Codes
 
-```swift
-InsertAffiliateSwift.setInsertAffiliateIdentifier(referringLink: "your_affiliate_link")
+Offer Codes allow you to automatically present a discount to users who access an affiliate's link or enter a short code. This provides affiliates with a compelling incentive to promote your app, as discounts are automatically applied during the redemption flow [(learn more)](https://docs.insertaffiliate.com/offer-codes). 
+
+You'll need your Offer Code URL ID, which can be created and retrieved from App Store Connect. Instructions to retrieve your Offer Code URL ID are available [here](https://docs.insertaffiliate.com/offer-codes#create-the-codes-within-app-store-connect).
+
+To fetch an Offer Code and conditionally redirect the user to redeem it, pass the affiliate identifier (deep link or short code) to:
+
+```dart
+insertAffiliateSdk.fetchAndConditionallyOpenUrl("your_affiliate_identifier", "your_offer_code_url_id");
+```
+
+#### Branch.io Example
+```dart
+import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+class _MyAppState extends State<MyApp> {
+    
+    late StreamSubscription<Map> _branchStreamSubscription;
+    
+    @override
+    void initState() {
+        super.initState();
+        
+        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
+            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
+                final referringLink = data["~referring_link"];
+                insertAffiliateSdk.fetchAndConditionallyOpenUrl(
+                    data["~referring_link"],
+                    "{{ your_offer_code_url_id }}"
+                );
+
+                // Other code required for Insert Affiliate in the other listed steps...
+            }
+        }, onError: (error) {
+            print('Branch session error: ${error.toString()}');
+        });
+    }
+}
+```
+
+#### Short Code Example
+```dart
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+class ShortCodeInputWidget extends StatefulWidget {
+  @override
+  _ShortCodeInputWidgetState createState() => _ShortCodeInputWidgetState();
+}
+
+class _ShortCodeInputWidgetState extends State<ShortCodeInputWidget> {
+  final TextEditingController _shortCodeController = TextEditingController();
+
+  void _handleShortCodeSubmission() async {
+    final shortCode = _shortCodeController.text.trim();
+    
+    if (shortCode.isNotEmpty) {
+      // Set the short code for affiliate tracking
+      await insertAffiliateSdk.setShortCode(shortCode);
+      
+      // Fetch and conditionally open offer code URL
+      await insertAffiliateSdk.fetchAndConditionallyOpenUrl(
+        shortCode, 
+        "{{ your_offer_code_url_id }}"
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TextField(
+          controller: _shortCodeController,
+          decoration: InputDecoration(
+            labelText: 'Enter your code',
+            hintText: 'e.g., ABC123',
+          ),
+        ),
+        ElevatedButton(
+          onPressed: _handleShortCodeSubmission,
+          child: Text('Apply Code'),
+        ),
+      ],
+    );
+  }
+}
+
 ```

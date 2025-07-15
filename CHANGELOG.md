@@ -1,3 +1,9 @@
+## 1.1.1
+Support for iOS offer codes on iOS only.
+
+## 1.1.0
+Support for iOS offer codes
+
 ## 1.0.9
 Short Code 3-25 chars
 

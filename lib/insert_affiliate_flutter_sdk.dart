@@ -274,6 +274,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Offer Codes
   Future<void> fetchAndConditionallyOpenUrl(String affiliateLink, String offerCodeUrlId) async {
     try {
+      if (!Platform.isIOS) {
+        errorLog("Offer codes are only supported on iOS", "warn");
+        return;
+      }
+      
       final offerCode = await fetchOfferCode(affiliateLink);
       
       if (offerCode != null && offerCode.isNotEmpty) {

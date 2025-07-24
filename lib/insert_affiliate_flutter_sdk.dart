@@ -9,15 +9,27 @@ import 'package:url_launcher/url_launcher.dart';
 
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
+  bool _verboseLogging = false;
 
   InsertAffiliateFlutterSDK({
     required this.companyCode,
-  }) {
+    bool verboseLogging = false,
+  }) : _verboseLogging = verboseLogging {
     _init();
   }
 
   void _init() async {
+    if (_verboseLogging) {
+      print('[Insert Affiliate] [VERBOSE] Starting SDK initialization...');
+      print('[Insert Affiliate] [VERBOSE] Company code provided: ${companyCode.isNotEmpty ? 'Yes' : 'No'}');
+      print('[Insert Affiliate] [VERBOSE] Verbose logging enabled');
+    }
+    
     _storeAndReturnShortUniqueDeviceId();
+    
+    if (_verboseLogging) {
+      print('[Insert Affiliate] [VERBOSE] SDK initialization completed');
+    }
   }
 
   // MARK: Company Code
@@ -56,30 +68,45 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   Future<String> _storeAndReturnShortUniqueDeviceId() async {
+    verboseLog('Getting or generating user ID...');
     final prefs = await SharedPreferences.getInstance();
     final existingUserId = prefs.getString('shortUniqueDeviceID');
     if (existingUserId != null) {
+      verboseLog('Found existing user ID: $existingUserId');
       return existingUserId;
     }
+    verboseLog('No existing user ID found, generating new one...');
     final userId = _generateUserId();
     await prefs.setString('shortUniqueDeviceID', userId);
+    verboseLog('Generated and saved new user ID: $userId');
     return userId;
   }
 
   // MARK: Setting Insert Affiliate Link
   Future<void> setInsertAffiliateIdentifier(String referringLink) async {
+    print('[Insert Affiliate] Setting affiliate identifier.');
+    verboseLog('Input referringLink: $referringLink');
+
     if (companyCode.isEmpty) {
       errorLog("Company code cannot be empty", "warn");
+      verboseLog('Company code missing, cannot proceed with API call');
       return;
     }
 
+    verboseLog('Checking if referring link is already a short code...');
     if (isShortCode(referringLink)) {
+      print('[Insert Affiliate] Referring link is already a short code.');
+      verboseLog('Link is already a short code, storing directly');
       await _storeInsertAffiliateReferringLink(referringLink);
       return;
     }
 
+    verboseLog('Link is not a short code, will convert via API');
+    verboseLog('Encoding referring link for API call...');
     final encodedAffiliateLink = Uri.encodeComponent(referringLink);
     final urlString = "http://api.insertaffiliate.com/V1/convert-deep-link-to-short-link?companyId=$companyCode&deepLinkUrl=$encodedAffiliateLink";
+    
+    verboseLog('Making API request to convert deep link to short code...');
 
     try {
       final response = await http.get(
@@ -89,47 +116,71 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         },
       );
 
+      verboseLog('API response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         final shortLink = jsonResponse['shortLink'];
 
         if (shortLink != null && shortLink.isNotEmpty) {
+          print('[Insert Affiliate] Short link received: $shortLink');
+          verboseLog('Successfully converted to short link: $shortLink');
+          verboseLog('Storing short link...');
           await _storeInsertAffiliateReferringLink(shortLink);
+          verboseLog('Short link stored successfully');
           return;
         } else { // If theres an issue, store what was passed to save for later potential processing/recovery
+          verboseLog('Unexpected API response, storing original link as fallback');
           await _storeInsertAffiliateReferringLink(referringLink);
         }
       }
     } catch (error) {
       errorLog("Error setting insert affiliate identifier: $error", "error");
+      verboseLog('Error in setInsertAffiliateIdentifier: $error');
     }
 
+    verboseLog('Storing original link as fallback');
     await _storeInsertAffiliateReferringLink(referringLink);
   }
 
   Future<void> _storeInsertAffiliateReferringLink(String referringLink) async {
+    print('[Insert Affiliate] Storing affiliate identifier: $referringLink');
+    verboseLog('Saving referrer link to SharedPreferences...');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('referring_link', referringLink);
+    verboseLog('Referrer link saved to SharedPreferences successfully');
 
+    verboseLog('Attempting to fetch offer code for stored affiliate identifier...');
     await retrieveAndStoreOfferCode(referringLink);
     notifyListeners();
   }
 
   Future<String?> returnInsertAffiliateIdentifier() async {
+    verboseLog('Getting insert affiliate identifier...');
     final prefs = await SharedPreferences.getInstance();
     final referringLink = prefs.getString('referring_link');
     final shortUniqueDeviceID = prefs.getString('shortUniqueDeviceID');
+    
+    verboseLog('SharedPreferences - referringLink: ${referringLink ?? 'empty'}, shortUniqueDeviceID: ${shortUniqueDeviceID ?? 'empty'}');
+    
     if (referringLink == null || shortUniqueDeviceID == null) {
+      verboseLog('No affiliate identifier found in storage');
       return null;
     }
-    return "$referringLink-${shortUniqueDeviceID}";
+    
+    final identifier = "$referringLink-$shortUniqueDeviceID";
+    verboseLog('Found identifier: $identifier');
+    return identifier;
   }
 
   Future<void> storeExpectedStoreTransaction(String purchaseToken) async {
     try {
+      verboseLog('Storing expected store transaction with token: $purchaseToken');
+      
       // 1. Ensure companyCode exists
       if (companyCode.isEmpty) {
         errorLog("[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.", "error");
+        verboseLog('Cannot store transaction: no company code available');
         return;
       }
 
@@ -137,8 +188,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       final shortCode = await returnInsertAffiliateIdentifier();
       if (shortCode == null) {
         errorLog("[Insert Affiliate] No affiliate identifier found. Please set one before tracking events.", "error");
+        verboseLog('Cannot store transaction: no affiliate identifier available');
         return;
       }
+
+      verboseLog('Company code: $companyCode, Short code: $shortCode');
 
       // 3. Build the JSON payload
       final payload = {
@@ -147,6 +201,9 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         'shortCode': shortCode,
         'storedDate': DateTime.now().toIso8601String(),
       };
+
+      print("[Insert Affiliate] Storing expected transaction: $payload");
+      verboseLog('Making API call to store expected transaction...');
 
       // 4. Send the request to the Insert Affiliate API
       final response = await http.post(
@@ -157,15 +214,20 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         body: jsonEncode(payload),
       );
 
+      verboseLog('API response status: ${response.statusCode}');
+
       // 5. Handle response
       if (response.statusCode == 200) {
         print("[Insert Affiliate] Expected transaction stored successfully.");
+        verboseLog('Expected transaction stored successfully on server');
       } else {
         print("[Insert Affiliate] Failed to store expected transaction. "
           "Status code: ${response.statusCode}, Response: ${response.body}");
+        verboseLog('API error response: ${response.body}');
       }
     } catch (error) {
       errorLog("[Insert Affiliate] Error storing expected transaction: $error", "error");
+      verboseLog('Network error storing transaction: $error');
     }
   }
 
@@ -231,10 +293,15 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Event Tracking
   Future<void> trackEvent({required String eventName}) async {
     try {
+      verboseLog('Tracking event: $eventName');
+      
       if (companyCode.isEmpty) {
         errorLog("[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.", "error");
+        verboseLog('Cannot track event: no company code available');
         return;
       }
+
+      print('track event called with - companyCode: $companyCode');
 
       final affiliateLink = await returnInsertAffiliateIdentifier();
 
@@ -243,14 +310,20 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
           "[Insert Affiliate] No affiliate link found. Please save one before tracking events.",
           "warn",
         );
+        verboseLog('Cannot track event: no affiliate identifier available');
         return;
       }
+
+      verboseLog('Deep link param: $affiliateLink');
 
       final payload = {
         "eventName": eventName,
         "deepLinkParam": affiliateLink,
         "companyId": companyCode,
       };
+
+      verboseLog('Track event payload: ${jsonEncode(payload)}');
+      verboseLog('Making API call to track event...');
 
       final response = await http.post(
         Uri.parse('https://api.insertaffiliate.com/v1/trackEvent'),
@@ -260,16 +333,21 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         body: jsonEncode(payload),
       );
 
+      verboseLog('Track event API response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        // ignore: avoid_print
+        print('[Insert Affiliate] Event tracked successfully');
+        verboseLog('Event tracked successfully on server');
       } else {
         errorLog(
           "[Insert Affiliate] Failed to track event. Status code: ${response.statusCode}, Response: ${response.body}",
           "error",
         );
+        verboseLog('Track event API error: status ${response.statusCode}, response: ${response.body}');
       }
     } catch (error) {
       errorLog("[Insert Affiliate] Error tracking event: $error", "error");
+      verboseLog('Network error tracking event: $error');
     }
   }
 
@@ -278,12 +356,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   Future<String?> fetchOfferCode(String affiliateLink) async {
     try {
       if (companyCode.isEmpty) {
-        errorLog("Cannot fetch offer code: no company code available", "warn");
+        verboseLog('Cannot fetch offer code: no company code available');
         return null;
       }
 
       final encodedAffiliateLink = Uri.encodeComponent(affiliateLink);
       final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink";
+      
+      verboseLog('Fetching offer code from: $url');
       
       final response = await http.get(Uri.parse(url));
       
@@ -295,17 +375,22 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
             offerCode.contains("errorAffiliateoffercodenotfoundinanycompany") ||
             offerCode.contains("errorAffiliateoffercodenotfoundinanycompanyAffiliatelinkwas") ||
             offerCode.contains("Routenotfound")) {
-          errorLog("Offer code not found or invalid: $offerCode", "warn");
+          print("[Insert Affiliate] Offer code not found or invalid: $offerCode");
+          verboseLog("Offer code not found or invalid: $offerCode");
           return null;
         }
         
-        return _cleanOfferCode(offerCode);
+        final cleanedOfferCode = _cleanOfferCode(offerCode);
+        verboseLog('Successfully fetched and cleaned offer code: $cleanedOfferCode');
+        return cleanedOfferCode;
       } else {
         errorLog("Failed to fetch offer code. Status code: ${response.statusCode}, Response: ${response.body}", "error");
+        verboseLog('Failed to fetch offer code. Status code: ${response.statusCode}, Response: ${response.body}');
         return null;
       }
     } catch (error) {
       errorLog("Error fetching offer code: $error", "error");
+      verboseLog('Error fetching offer code: $error');
       return null;
     }
   }
@@ -327,6 +412,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   Future<void> retrieveAndStoreOfferCode(String affiliateLink) async {
     try {
+      verboseLog('Attempting to retrieve and store offer code for: $affiliateLink');
+      
       final offerCode = await fetchOfferCode(affiliateLink);
       
       if (offerCode != null && offerCode.isNotEmpty) {
@@ -337,8 +424,10 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         // Notify listeners of the change
         notifyListeners();
         
+        verboseLog('Successfully stored offer code: $offerCode');
         print('[Insert Affiliate] Offer code retrieved and stored successfully');
       } else {
+        verboseLog('No valid offer code found to store');
         // Clear stored offer code if none found
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('offer_code', '');
@@ -348,6 +437,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
     } catch (error) {
       errorLog("Error retrieving and storing offer code: $error", "error");
+      verboseLog('Error in retrieveAndStoreOfferCode: $error');
     }
   }
 
@@ -363,14 +453,21 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   String _cleanOfferCode(String offerCode) {
-    // Remove special characters, keep only alphanumeric
-    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    // Remove special characters, keep only alphanumeric and underscores
+    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
   }
 
   // Dispose the subscription to avoid memory leaks
   @override
   void dispose() {
     super.dispose();
+  }
+
+  // Helper function for verbose logging
+  void verboseLog(String message) {
+    if (_verboseLogging) {
+      print('[Insert Affiliate] [VERBOSE] $message');
+    }
   }
 
   // Function to log errors and warnings

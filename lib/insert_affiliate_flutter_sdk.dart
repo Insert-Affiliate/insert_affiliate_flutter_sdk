@@ -110,6 +110,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   Future<void> _storeInsertAffiliateReferringLink(String referringLink) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('referring_link', referringLink);
+
+    await retrieveAndStoreOfferCode(referringLink);
     notifyListeners();
   }
 
@@ -272,27 +274,16 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   // MARK: Offer Codes
-  Future<void> fetchAndConditionallyOpenUrl(String affiliateLink, String offerCodeUrlId) async {
-    try {
-      if (!Platform.isIOS) {
-        errorLog("Offer codes are only supported on iOS", "warn");
-        return;
-      }
-      
-      final offerCode = await fetchOfferCode(affiliateLink);
-      
-      if (offerCode != null && offerCode.isNotEmpty) {
-        await openRedeemURL(offerCode, offerCodeUrlId);
-      }
-    } catch (error) {
-      errorLog("Error fetching and opening offer code URL: $error", "error");
-    }
-  }
 
   Future<String?> fetchOfferCode(String affiliateLink) async {
     try {
+      if (companyCode.isEmpty) {
+        errorLog("Cannot fetch offer code: no company code available", "warn");
+        return null;
+      }
+
       final encodedAffiliateLink = Uri.encodeComponent(affiliateLink);
-      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$encodedAffiliateLink";
+      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink";
       
       final response = await http.get(Uri.parse(url));
       
@@ -331,6 +322,43 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
     } catch (error) {
       errorLog("Error opening redeem URL: $error", "error");
+    }
+  }
+
+  Future<void> retrieveAndStoreOfferCode(String affiliateLink) async {
+    try {
+      final offerCode = await fetchOfferCode(affiliateLink);
+      
+      if (offerCode != null && offerCode.isNotEmpty) {
+        // Store in SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('offer_code', offerCode);
+        
+        // Notify listeners of the change
+        notifyListeners();
+        
+        print('[Insert Affiliate] Offer code retrieved and stored successfully');
+      } else {
+        // Clear stored offer code if none found
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('offer_code', '');
+        
+        // Notify listeners of the change
+        notifyListeners();
+      }
+    } catch (error) {
+      errorLog("Error retrieving and storing offer code: $error", "error");
+    }
+  }
+
+  Future<String?> getStoredOfferCode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final offerCode = prefs.getString('offer_code');
+      return (offerCode != null && offerCode.isNotEmpty) ? offerCode : null;
+    } catch (error) {
+      errorLog("Error getting stored offer code: $error", "error");
+      return null;
     }
   }
 

@@ -464,13 +464,6 @@ The offer code modifier can be retrieved using:
 String? offerCode = await insertAffiliateSdk.getStoredOfferCode();
 ```
 
-##### 3. Manual Offer Code Fetching
-You can also manually fetch offer codes for specific affiliate links:
-
-```dart
-String? offerCode = await insertAffiliateSdk.fetchOfferCode(affiliateLink);
-```
-
 #### Setup Requirements
 
 ##### App Store Connect Configuration
@@ -694,25 +687,7 @@ class _NativeIAPPurchaseViewState extends State<NativeIAPPurchaseView> {
   }
 
   Future<void> handlePurchase(String productId) async {
-    try {
-      final ProductDetails productDetails = availableProducts.firstWhere(
-        (product) => product.id == productId,
-      );
-      
-      String? appAccountToken;
-      if (Platform.isIOS) {
-        appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction();
-      }
-      
-      final PurchaseParam purchaseParam = PurchaseParam(
-        productDetails: productDetails,
-        applicationUserName: appAccountToken,
-      );
-      
-      await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-    } catch (error) {
-      print('Purchase failed: $error');
-    }
+   // Handle purchase is unchanged from previous examples.
   }
 
   @override

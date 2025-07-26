@@ -72,6 +72,33 @@ void main() async {
 ```
 - Replace `{{ your_company_code }}` with the unique company code associated with your Insert Affiliate account. You can find this code in your dashboard under [Settings](http://app.insertaffiliate.com/settings).
 
+### Verbose Logging (Optional)
+
+For debugging and troubleshooting, you can enable verbose logging to get detailed insights into the SDK's operations:
+
+```dart
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Initialise Insert Affiliate SDK with verbose logging enabled
+    insertAffiliateSdk = InsertAffiliateFlutterSDK(
+        companyCode: "{{ your_company_code }}",
+        verboseLogging: true,  // Enable detailed debugging logs
+    ); 
+
+    runApp(MyApp());
+}
+```
+
+**When verbose logging is enabled, you'll see detailed logs with the `[Insert Affiliate] [VERBOSE]` prefix that show debugging logs**
+This can be used to quickly identify configuration or setup issues
+
+⚠️ **Important**: Disable verbose logging in production builds to avoid exposing sensitive debugging information and to optimize performance.
+
 
 ## In-App Purchase Setup [Required]
 Insert Affiliate requires a Receipt Verification platform to validate in-app purchases. You must choose **one** of our supported partners:
@@ -413,78 +440,126 @@ ElevatedButton(
 )
 ```
 
-### 3. Offer Codes
+### 3. Discounts for Users → Offer Codes / Dynamic Product IDs
 
-Offer Codes allow you to automatically present a discount to users who access an affiliate's link or enter a short code. This provides affiliates with a compelling incentive to promote your app, as discounts are automatically applied during the redemption flow [(learn more)](https://docs.insertaffiliate.com/offer-codes). 
+The SDK allows you to apply dynamic modifiers to in-app purchases based on whether the app was installed via an affiliate. These modifiers can be used to swap the default product ID for a discounted or trial-based one - similar to applying an offer code.
 
-**Note: Offer Codes are currently only supported on iOS.**
+> **Note:** Discount Codes are currently supported on **iOS only**.
 
-You'll need your Offer Code URL ID, which can be created and retrieved from App Store Connect. Instructions to retrieve your Offer Code URL ID are available [here](https://docs.insertaffiliate.com/offer-codes#create-the-codes-within-app-store-connect).
+#### How It Works
 
-To fetch an Offer Code and conditionally redirect the user to redeem it, pass the affiliate identifier (deep link or short code) to:
+When a user clicks an affiliate link or enters a short code of an affiliate with a linked offer (set up in the **Insert Affiliate Dashboard**), the SDK auto-populates offer code data with a relevant modifier (e.g., `_oneWeekFree`). You can append this to your base product ID to dynamically display the correct subscription.
+
+#### Basic Usage
+
+##### 1. Automatic Offer Code Fetching
+If an affiliate short code is stored, the SDK automatically fetches and saves the associated offer code modifier when:
+- An affiliate identifier is set via `setInsertAffiliateIdentifier()`
+- A short code is set via `setShortCode()`
+
+##### 2. Access the Stored Offer Code
+The offer code modifier can be retrieved using:
 
 ```dart
-insertAffiliateSdk.fetchAndConditionallyOpenUrl("your_affiliate_identifier", "your_offer_code_url_id");
+String? offerCode = await insertAffiliateSdk.getStoredOfferCode();
 ```
 
-#### Branch.io Example
+#### Setup Requirements
+
+##### App Store Connect Configuration
+1. Create both a base and a promotional product:
+   - Base product: `oneMonthSubscription`
+   - Promo product: `oneMonthSubscription_oneWeekFree`
+2. Ensure **both** products are approved and available for sale.
+
+**Product Naming Pattern:**
+- Follow the pattern: `{baseProductId}{OfferCode}`
+- Example: `oneMonthSubscription` + `_oneWeekFree` = `oneMonthSubscription_oneWeekFree`
+
+---
+
+#### RevenueCat Integration Example
+
+For apps using RevenueCat, you can dynamically construct offering identifiers:
+
 ```dart
-import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-class _MyAppState extends State<MyApp> {
-    
-    late StreamSubscription<Map> _branchStreamSubscription;
-    
-    @override
-    void initState() {
-        super.initState();
-        
-        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
-            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
-                final referringLink = data["~referring_link"];
-                insertAffiliateSdk.fetchAndConditionallyOpenUrl(
-                    data["~referring_link"],
-                    "{{ your_offer_code_url_id }}"
-                );
-
-                // Other code required for Insert Affiliate in the other listed steps...
-            }
-        }, onError: (error) {
-            print('Branch session error: ${error.toString()}');
-        });
-    }
-}
-```
-
-#### Short Code Example
-```dart
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-class ShortCodeInputWidget extends StatefulWidget {
+class PurchaseHandler extends StatefulWidget {
   @override
-  _ShortCodeInputWidgetState createState() => _ShortCodeInputWidgetState();
+  _PurchaseHandlerState createState() => _PurchaseHandlerState();
 }
 
-class _ShortCodeInputWidgetState extends State<ShortCodeInputWidget> {
-  final TextEditingController _shortCodeController = TextEditingController();
+class _PurchaseHandlerState extends State<PurchaseHandler> {
+  List<Package> availablePackages = [];
+  String? offerCode;
+  bool loading = false;
 
-  void _handleShortCodeSubmission() async {
-    final shortCode = _shortCodeController.text.trim();
+  @override
+  void initState() {
+    super.initState();
+    fetchSubscriptions();
+  }
+
+  Future<void> fetchSubscriptions() async {
+    setState(() => loading = true);
     
-    if (shortCode.isNotEmpty) {
-      // Set the short code for affiliate tracking
-      await insertAffiliateSdk.setShortCode(shortCode);
+    try {
+      // Get stored offer code
+      offerCode = await insertAffiliateSdk.getStoredOfferCode();
       
-      // Fetch and conditionally open offer code URL
-      await insertAffiliateSdk.fetchAndConditionallyOpenUrl(
-        shortCode, 
-        "{{ your_offer_code_url_id }}"
-      );
+      final offerings = await Purchases.getOfferings();
+      List<Package> packagesToUse = [];
+
+      if (offerCode != null && offerCode!.isNotEmpty) {
+        // Construct modified product IDs from base products
+        final basePackages = offerings.current?.availablePackages ?? [];
+
+        for (final basePackage in basePackages) {
+          final baseProductId = basePackage.storeProduct.identifier;
+          final modifiedProductId = '$baseProductId$offerCode';
+
+          // Search all offerings for the modified product
+          bool foundModified = false;
+          
+          for (final offering in offerings.all.values) {
+            final modifiedPackage = offering.availablePackages.firstWhere(
+              (pkg) => pkg.storeProduct.identifier == modifiedProductId,
+              orElse: () => null,
+            );
+
+            if (modifiedPackage != null) {
+              packagesToUse.add(modifiedPackage);
+              foundModified = true;
+              break;
+            }
+          }
+
+          // Fallback to base product if no modified version
+          if (!foundModified) {
+            packagesToUse.add(basePackage);
+          }
+        }
+      } else {
+        packagesToUse = offerings.current?.availablePackages ?? [];
+      }
+
+      setState(() {
+        availablePackages = packagesToUse;
+        loading = false;
+      });
+    } catch (error) {
+      print('Error fetching subscriptions: $error');
+      setState(() => loading = false);
+    }
+  }
+
+  Future<void> handlePurchase(Package package) async {
+    try {
+      await Purchases.purchasePackage(package);
+    } catch (error) {
+      print('Purchase failed: $error');
     }
   }
 
@@ -492,20 +567,241 @@ class _ShortCodeInputWidgetState extends State<ShortCodeInputWidget> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TextField(
-          controller: _shortCodeController,
-          decoration: InputDecoration(
-            labelText: 'Enter your code',
-            hintText: 'e.g., ABC123',
+        if (offerCode != null && offerCode!.isNotEmpty)
+          Container(
+            padding: EdgeInsets.all(10),
+            margin: EdgeInsets.only(bottom: 15),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '🎉 Special Offer Applied: $offerCode',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-        ),
-        ElevatedButton(
-          onPressed: _handleShortCodeSubmission,
-          child: Text('Apply Code'),
-        ),
+        
+        if (loading)
+          CircularProgressIndicator()
+        else
+          ...availablePackages.map((package) => 
+            ElevatedButton(
+              onPressed: () => handlePurchase(package),
+              child: Text('Buy: ${package.storeProduct.identifier}'),
+            ),
+          ).toList(),
       ],
     );
   }
 }
-
 ```
+
+---
+
+#### Native IAP Integration Example
+
+For apps using the native `in_app_purchase` package directly:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class NativeIAPPurchaseView extends StatefulWidget {
+  @override
+  _NativeIAPPurchaseViewState createState() => _NativeIAPPurchaseViewState();
+}
+
+class _NativeIAPPurchaseViewState extends State<NativeIAPPurchaseView> {
+  final InAppPurchase _iap = InAppPurchase.instance;
+  List<ProductDetails> availableProducts = [];
+  String? offerCode;
+  bool loading = false;
+  
+  static const String baseProductIdentifier = "oneMonthSubscription";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchProducts();
+  }
+
+  String get dynamicProductIdentifier {
+    return offerCode != null && offerCode!.isNotEmpty
+        ? '$baseProductIdentifier$offerCode' // e.g., "oneMonthSubscription_oneWeekFree"
+        : baseProductIdentifier;
+  }
+
+  Future<void> fetchProducts() async {
+    setState(() => loading = true);
+    
+    try {
+      // Get stored offer code
+      offerCode = await insertAffiliateSdk.getStoredOfferCode();
+      
+      // Try to fetch the dynamic product first
+      Set<String> productIds = {dynamicProductIdentifier};
+      
+      // Also include base product as fallback
+      if (offerCode != null && offerCode!.isNotEmpty) {
+        productIds.add(baseProductIdentifier);
+      }
+      
+      final ProductDetailsResponse response = await _iap.queryProductDetails(productIds);
+      
+      if (response.notFoundIDs.isNotEmpty) {
+        print('Products not found: ${response.notFoundIDs}');
+      }
+      
+      // Prioritize the dynamic product if it exists
+      List<ProductDetails> sortedProducts = response.productDetails;
+      if (offerCode != null && offerCode!.isNotEmpty && sortedProducts.length > 1) {
+        sortedProducts.sort((a, b) => 
+          a.id == dynamicProductIdentifier ? -1 : 1
+        );
+      }
+      
+      setState(() {
+        availableProducts = sortedProducts;
+        loading = false;
+      });
+      
+      print('Loaded products for: ${productIds.join(', ')}');
+      
+    } catch (error) {
+      try {
+        // Fallback logic
+        final ProductDetailsResponse fallbackResponse = await _iap.queryProductDetails({baseProductIdentifier});
+        setState(() {
+          availableProducts = fallbackResponse.productDetails;
+          loading = false;
+        });
+      } catch (fallbackError) {
+        print('Failed to fetch base products: $fallbackError');
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  Future<void> handlePurchase(String productId) async {
+   // Handle purchase is unchanged from previous examples.
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ProductDetails? primaryProduct = availableProducts.isNotEmpty ? availableProducts.first : null;
+
+    return Padding(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Premium Subscription',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          
+          if (offerCode != null && offerCode!.isNotEmpty)
+            Container(
+              padding: EdgeInsets.all(10),
+              margin: EdgeInsets.only(bottom: 15),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '🎉 Special Offer Applied: $offerCode',
+                style: TextStyle(
+                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          
+          if (loading)
+            Center(child: CircularProgressIndicator())
+          else if (primaryProduct != null) ...[
+            Text(
+              primaryProduct.title,
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 5),
+            Text(
+              'Price: ${primaryProduct.price}',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            ),
+            SizedBox(height: 5),
+            Text(
+              'Product ID: ${primaryProduct.id}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+            ),
+            SizedBox(height: 15),
+            
+            ElevatedButton(
+              onPressed: loading ? null : () => handlePurchase(primaryProduct.id),
+              child: Text(loading ? "Processing..." : "Subscribe Now"),
+            ),
+            
+            if (primaryProduct.id == dynamicProductIdentifier && offerCode != null && offerCode!.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: Text(
+                  '✓ Promotional pricing applied',
+                  style: TextStyle(fontSize: 12, color: Colors.green),
+                ),
+              ),
+          ] else ...[
+            Text(
+              'Product not found: $dynamicProductIdentifier',
+              style: TextStyle(color: Colors.red),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: fetchProducts,
+              child: Text('Retry'),
+            ),
+          ],
+          
+          if (availableProducts.length > 1) ...[
+            SizedBox(height: 20),
+            Text(
+              'Other Options:',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            ...availableProducts.skip(1).map((product) => 
+              Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: ElevatedButton(
+                  onPressed: () => handlePurchase(product.id),
+                  child: Text('${product.title} - ${product.price}'),
+                ),
+              ),
+            ).toList(),
+          ],
+        ],
+      ),
+    );
+  }
+}
+```
+
+##### Key Features of Native IAP Integration:
+
+1. **Dynamic Product Loading**: Automatically constructs product IDs using the offer code modifier
+2. **Fallback Strategy**: If the promotional product isn't found, falls back to the base product
+3. **Visual Feedback**: Shows users when promotional pricing is applied
+4. **Error Handling**: Graceful handling when products aren't available
+5. **Platform Integration**: Properly handles iOS app account tokens for affiliate tracking
+
+#### Best Practices
+
+1. **Product Setup**: Always create both base and promotional products in App Store Connect
+2. **Naming Convention**: Use consistent naming patterns for offer code modifiers
+3. **Fallback Logic**: Always implement fallback to base products if promotional ones aren't available
+4. **User Experience**: Clearly indicate when special pricing is applied
+5. **Testing**: Test both scenarios - with and without offer codes applied

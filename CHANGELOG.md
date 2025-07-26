@@ -1,3 +1,6 @@
+## 1.1.2
+Fix approach for iOS offer codes - iOS only.
+
 ## 1.1.1
 Support for iOS offer codes on iOS only.
 

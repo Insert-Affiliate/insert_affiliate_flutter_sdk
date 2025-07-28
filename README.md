@@ -476,7 +476,7 @@ String? offerCode = await insertAffiliateSdk.getStoredOfferCode();
 
 Once configured, when users click that affiliate's links or enter their short codes, your app will automatically receive the modifier and can load the appropriate discounted product.
 
-##### App Store Connect Configuration
+#### App Store Connect Configuration
 1. Create both a base and a promotional product:
    - Base product: `oneMonthSubscription`
    - Promo product: `oneMonthSubscription_oneWeekFree`

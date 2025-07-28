@@ -360,10 +360,19 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         return null;
       }
 
+      String platformType = 'ios';
+      // Check if its iOS or Android here
+      if (!Platform.isIOS) {
+        verboseLog('Platform is not iOS, setting platform type to android');
+        platformType = 'android';
+      } else {
+        verboseLog('Platform is iOS, setting platform type to ios');
+      }
+
       final encodedAffiliateLink = Uri.encodeComponent(affiliateLink);
-      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink";
+      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink?platformType=$platformType";
       
-      verboseLog('Fetching offer code from: $url');
+      verboseLog('Starting to fetch offer code from: $url');
       
       final response = await http.get(Uri.parse(url));
       

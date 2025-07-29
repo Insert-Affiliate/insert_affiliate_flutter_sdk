@@ -352,7 +352,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   // MARK: Offer Codes
-
   Future<String?> fetchOfferCode(String affiliateLink) async {
     try {
       if (companyCode.isEmpty) {
@@ -360,10 +359,19 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         return null;
       }
 
+      String platformType = 'ios';
+      // Check if its iOS or Android here
+      if (!Platform.isIOS) {
+        verboseLog('Platform is not iOS, setting platform type to android');
+        platformType = 'android';
+      } else {
+        verboseLog('Platform is iOS, setting platform type to ios');
+      }
+
       final encodedAffiliateLink = Uri.encodeComponent(affiliateLink);
-      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink";
+      final url = "https://api.insertaffiliate.com/v1/affiliateReturnOfferCode/$companyCode/$encodedAffiliateLink?platformType=$platformType";
       
-      verboseLog('Fetching offer code from: $url');
+      verboseLog('Starting to fetch offer code from: $url');
       
       final response = await http.get(Uri.parse(url));
       
@@ -392,21 +400,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       errorLog("Error fetching offer code: $error", "error");
       verboseLog('Error fetching offer code: $error');
       return null;
-    }
-  }
-
-  Future<void> openRedeemURL(String offerCode, String offerCodeUrlId) async {
-    try {
-      final redeemUrl = "https://apps.apple.com/redeem?ctx=offercodes&id=$offerCodeUrlId&code=$offerCode";
-      final uri = Uri.parse(redeemUrl);
-      
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        errorLog("Could not launch redeem URL: $redeemUrl", "error");
-      }
-    } catch (error) {
-      errorLog("Error opening redeem URL: $error", "error");
     }
   }
 
@@ -453,8 +446,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   String _cleanOfferCode(String offerCode) {
-    // Remove special characters, keep only alphanumeric and underscores
-    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+    // Remove special characters, keep only alphanumeric, underscores, and dashes
+    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '');
   }
 
   // Dispose the subscription to avoid memory leaks

@@ -352,7 +352,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   // MARK: Offer Codes
-
   Future<String?> fetchOfferCode(String affiliateLink) async {
     try {
       if (companyCode.isEmpty) {
@@ -404,21 +403,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
-  Future<void> openRedeemURL(String offerCode, String offerCodeUrlId) async {
-    try {
-      final redeemUrl = "https://apps.apple.com/redeem?ctx=offercodes&id=$offerCodeUrlId&code=$offerCode";
-      final uri = Uri.parse(redeemUrl);
-      
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        errorLog("Could not launch redeem URL: $redeemUrl", "error");
-      }
-    } catch (error) {
-      errorLog("Error opening redeem URL: $error", "error");
-    }
-  }
-
   Future<void> retrieveAndStoreOfferCode(String affiliateLink) async {
     try {
       verboseLog('Attempting to retrieve and store offer code for: $affiliateLink');
@@ -462,8 +446,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   String _cleanOfferCode(String offerCode) {
-    // Remove special characters, keep only alphanumeric and underscores
-    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+    // Remove special characters, keep only alphanumeric, underscores, and dashes
+    return offerCode.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '');
   }
 
   // Dispose the subscription to avoid memory leaks

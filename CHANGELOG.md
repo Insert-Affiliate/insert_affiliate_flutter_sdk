@@ -1,3 +1,8 @@
+## 1.1.4
+AppsFlyer integration documentation and improvements.
+
+## 1.1.3
+
 ## 1.1.2
 Fix approach for iOS offer codes - iOS only.
 

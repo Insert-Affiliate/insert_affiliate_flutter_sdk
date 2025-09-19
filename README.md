@@ -374,6 +374,179 @@ class _MyAppState extends State<MyApp> {
 }
 ```
 
+### Using the SDK with AppsFlyer (Flutter)
+
+To set up deep linking with AppsFlyer, follow these steps:
+
+1. Create a [OneLink](https://support.appsflyer.com/hc/en-us/articles/208874366-Create-a-OneLink-link-for-your-campaigns) in AppsFlyer and pass it to our dashboard when an affiliate signs up.
+   - Example: [Create Affiliate](https://docs.insertaffiliate.com/create-affiliate).
+2. Initialize AppsFlyer SDK and set up deep link handling in your app.
+
+#### Prerequisites
+
+- AppsFlyer Dev Key from your AppsFlyer dashboard
+- iOS App ID and Android package name configured in AppsFlyer
+
+#### Install & Configure Dependencies
+
+1. **Add AppsFlyer SDK** to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  insert_affiliate_flutter_sdk: <latest_version>
+  appsflyer_sdk: ^6.14.4
+```
+
+2. **Configure manifest** for OneLink deep linking in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<activity android:name=".MainActivity" android:exported="true">
+    <!-- OneLink deep linking -->
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="{{ONELINK_SUBDOMAIN}}.onelink.me" />
+    </intent-filter>
+</activity>
+<!-- Add AppsFlyer metadata -->
+<application>
+    <meta-data android:name="com.appsflyer.ApiKey" android:value="{{APPSFLYER_DEV_KEY}}" />
+</application>
+```
+
+3. **Configure iOS** in `ios/Runner/Info.plist`:
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array><string>{{SCHEME}}</string></array>
+    </dict>
+</array>
+<key>com.apple.developer.associated-domains</key>
+<array>
+    <string>applinks:{{ONELINK_SUBDOMAIN}}.onelink.me</string>
+</array>
+```
+
+#### Initialize AppsFlyer and the SDK
+
+```dart
+import 'package:appsflyer_sdk/appsflyer_sdk.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+late AppsflyerSdk _appsflyerSdk;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize AppsFlyer SDK
+  final AppsFlyerOptions appsFlyerOptions = AppsFlyerOptions(
+    afDevKey: "{{APPSFLYER_DEV_KEY}}",
+    appId: "{{AF_APP_ID}}", // iOS App ID
+    showDebug: true,
+  );
+
+  _appsflyerSdk = AppsflyerSdk(appsFlyerOptions);
+
+  // Initialize Insert Affiliate SDK
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "{{ your_company_code }}",
+  );
+
+  runApp(MyApp());
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeAppsFlyer();
+  }
+
+  Future<void> _initializeAppsFlyer() async {
+    await _appsflyerSdk.initSdk(
+      registerConversionDataCallback: true,
+      registerOnDeepLinkingCallback: true,
+    );
+
+    // Handle deep links
+    _appsflyerSdk.onDeepLinking((deepLinkResult) async {
+      if (deepLinkResult.status == Status.FOUND) {
+        final deepLinkValue = deepLinkResult.deepLink?.deepLinkValue;
+        if (deepLinkValue != null && deepLinkValue.isNotEmpty) {
+          await insertAffiliateSdk.setInsertAffiliateIdentifier(deepLinkValue);
+          
+          // For RevenueCat: Set attributes
+          final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+          if (affiliateId != null) {
+            Purchases.setAttributes({"insert_affiliate": affiliateId});
+          }
+        }
+      }
+    });
+
+    // Handle install conversion data
+    _appsflyerSdk.onInstallConversionData((installConversionData) async {
+      if (installConversionData?['af_status'] == 'Non-organic') {
+        final affiliateLink = installConversionData?['media_source'] ?? 
+                             installConversionData?['campaign'];
+        if (affiliateLink != null) {
+          await insertAffiliateSdk.setInsertAffiliateIdentifier(affiliateLink);
+        }
+      }
+    });
+  }
+}
+```
+
+#### In-App Purchase Integration
+
+For **iOS App Store Direct**: The SDK automatically handles app account tokens during purchase.
+
+For **Google Play Direct**, add purchase token tracking:
+
+```dart
+// In your purchase stream listener
+if (Platform.isAndroid && purchaseDetails is GooglePlayPurchaseDetails) {
+  final purchaseToken = purchaseDetails.billingClientPurchase.purchaseToken;
+  await insertAffiliateSdk.storeExpectedStoreTransaction(purchaseToken);
+}
+```
+
+#### Verifying the Integration
+
+**Test deep link:**
+```bash
+# Android
+adb shell am start -a android.intent.action.VIEW -d "https://{{ONELINK_SUBDOMAIN}}.onelink.me/{{LINK_ID}}/test"
+
+# iOS (Simulator)
+xcrun simctl openurl booted "https://{{ONELINK_SUBDOMAIN}}.onelink.me/{{LINK_ID}}/test"
+```
+
+**Check logs:**
+```bash
+flutter logs | grep -E "(AppsFlyer|Insert Affiliate)"
+```
+
+#### Troubleshooting
+
+- **App opens store instead of app**: Verify package name/bundle ID and certificate fingerprints in AppsFlyer OneLink settings
+- **No attribution data**: Ensure AppsFlyer SDK initialization occurs before setting up callbacks
+- **Deep links not working**: Check intent-filter/URL scheme configuration
+
+| Placeholder | Example/Note |
+|-------------|--------------|
+| `{{APPSFLYER_DEV_KEY}}` | Your AppsFlyer Dev Key |
+| `{{AF_APP_ID}}` | iOS App ID (numbers only) |
+| `{{ONELINK_SUBDOMAIN}}` | e.g., yourapp (from yourapp.onelink.me) |
+| `{{SCHEME}}` | Custom scheme if applicable (e.g., myapp) |
+```
+
 ## Additional Features
 
 ### 1. Event Tracking (Beta)

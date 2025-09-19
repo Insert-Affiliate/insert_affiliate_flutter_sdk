@@ -1,3 +1,6 @@
+## 1.1.4
+AppsFlyer integration documentation and improvements.
+
 ## 1.1.3
 Android promo codes support added
 

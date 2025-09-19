@@ -1,3 +1,6 @@
+## 1.1.3
+Android promo codes support added
+
 ## 1.1.2
 Fix approach for iOS offer codes - iOS only.
 

@@ -5,11 +5,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
+import 'dart:math';
 import 'dart:io'; // For platform detection
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:install_referrer/install_referrer.dart';
+import 'package:android_play_install_referrer/android_play_install_referrer.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 // Callback type definition
@@ -647,12 +648,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     try {
       // Use Android install referrer API with 10 second timeout
-      final referrerDetails = await InstallReferrer.referrer.timeout(
+      final referrerDetails = await AndroidPlayInstallReferrer.installReferrer.timeout(
         const Duration(seconds: 10)
       );
 
-      if (referrerDetails?.installReferrer != null) {
-        verboseLog('Raw install referrer data: ${referrerDetails!.installReferrer}');
+      if (referrerDetails.installReferrer != null && referrerDetails.installReferrer!.isNotEmpty) {
+        verboseLog('Raw install referrer data: ${referrerDetails.installReferrer}');
         final success = await processInstallReferrerData(referrerDetails.installReferrer!);
         verboseLog(success ? 'Install referrer processed successfully' : 'No insertAffiliate parameter found');
         return success;

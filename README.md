@@ -99,6 +99,57 @@ This can be used to quickly identify configuration or setup issues
 
 ⚠️ **Important**: Disable verbose logging in production builds to avoid exposing sensitive debugging information and to optimize performance.
 
+### Deep Link Configuration (Optional)
+
+The SDK now supports built-in deep link handling and system information collection for enhanced affiliate tracking. Enable these features by adding the optional parameters to your SDK initialization:
+
+```dart
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Initialise Insert Affiliate SDK with deep link support
+    insertAffiliateSdk = InsertAffiliateFlutterSDK(
+        companyCode: "{{ your_company_code }}",
+        verboseLogging: true,  // Enable detailed debugging logs
+        insertLinksEnabled: true,  // Enable deep link processing
+        insertLinksClipboardEnabled: true,  // Enable clipboard detection (iOS only)
+    ); 
+
+    runApp(MyApp());
+}
+```
+
+**Deep Link Parameters:**
+- `insertLinksEnabled` (default: `false`): Enables the SDK's built-in deep link processing capabilities
+- `insertLinksClipboardEnabled` (default: `false`): Enables clipboard UUID detection on iOS for enhanced tracking
+
+**When enabled, the SDK provides:**
+- Automatic Android install referrer capture
+- Custom URL scheme handling (ia-companycode://shortcode)
+- Enhanced system information collection
+- Clipboard-based affiliate detection (iOS only)
+- Automatic backend integration for deep link events
+
+⚠️ **Important**: Enabling these features requires additional platform permissions (see platform configuration sections below).
+
+### API Methods for Deep Link Handling
+
+The SDK exposes these public methods for handling deep links in your app:
+
+```dart
+// Handle deep links from your existing deep link provider
+Future<bool> handled = await insertAffiliateSdk.handleDeepLink("your-deep-link-url");
+
+// Set up callback for affiliate identifier changes
+insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((String? identifier) {
+    print('Affiliate identifier changed: $identifier');
+    // Update your UI or trigger other actions
+});
+```
 
 ## In-App Purchase Setup [Required]
 Insert Affiliate requires a Receipt Verification platform to validate in-app purchases. You must choose **one** of our supported partners:
@@ -400,6 +451,11 @@ dependencies:
 2. **Configure manifest** for OneLink deep linking in `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
+<!-- Add these permissions at the top of the AndroidManifest.xml file -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="com.android.vending.INSTALL_REFERRER" />
+
 <activity android:name=".MainActivity" android:exported="true">
     <!-- OneLink deep linking -->
     <intent-filter android:autoVerify="true">
@@ -429,6 +485,9 @@ dependencies:
 <array>
     <string>applinks:{{ONELINK_SUBDOMAIN}}.onelink.me</string>
 </array>
+<!-- Add this permission for clipboard access (required for insertLinksClipboardEnabled) -->
+<key>NSPasteboardGeneralUseDescription</key>
+<string>This app needs clipboard access to detect affiliate links</string>
 ```
 
 #### Initialize AppsFlyer and the SDK

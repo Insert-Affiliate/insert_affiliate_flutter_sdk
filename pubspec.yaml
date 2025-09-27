@@ -19,7 +19,7 @@ dependencies:
   url_launcher: ^6.1.0
   connectivity_plus: ^3.0.0
   device_info_plus: ^9.0.0
-  install_referrer: ^2.0.0
+  install_referrer: ^1.2.1
   package_info_plus: ^4.0.0
 
 dev_dependencies:

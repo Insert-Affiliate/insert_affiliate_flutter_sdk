@@ -385,8 +385,162 @@ Insert Links by Insert Affiliate supports direct deep linking into your app. Thi
 2. **Initialization** of the Insert Affiliate SDK with Insert Links
 You must enable *insertLinksEnabled* when [initialising our SDK](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk?tab=readme-ov-file#insert-link-initialization)
 
-3. **Handle Insert Links** in your AppDelegate
+3. **Handle Insert Links** in your Flutter App
 The SDK provides a single `handleInsertLinks` method that automatically detects and handles different URL types. 
+
+#### Flutter App Integration
+
+For Flutter apps, you can handle Insert Links using the `onGenerateRoute` or `onUnknownRoute` callbacks in your MaterialApp, or by using the `go_router` package for more advanced routing.
+
+##### Basic Flutter App Example
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize the SDK with Insert Links enabled
+    insertAffiliateSdk = InsertAffiliateFlutterSDK(
+      companyCode: "your_company_code",
+      verboseLogging: true,
+      insertLinksEnabled: true,
+      insertLinksClipboardEnabled: true, // Optional: for iOS clipboard detection
+    );
+
+    // Set up callback for when affiliate identifier changes
+    insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+      if (identifier != null) {
+        // *** Required if using RevenueCat *** //
+        // Purchases.shared.attribution.setAttributes({"insert_affiliate": identifier});
+        // *** End of RevenueCat section *** //
+
+        // *** Required if using Apphud *** //
+        // Apphud.setUserProperty(key: "insert_affiliate", value: identifier, setOnce: false);
+        // *** End of Apphud Section *** //
+
+        // *** Required only if you're using Iaptic ** //
+        // InAppPurchase.initialize(
+        //   iapProducts: iapProductsArray,
+        //   validatorUrlString: "https://validator.iaptic.com/v3/validate?appName={{ your_iaptic_app_name }}&apiKey={{ your_iaptic_app_key_goes_here }}",
+        //   applicationUsername: identifier
+        // );
+        // *** End of Iaptic Section ** //
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Insert Affiliate App',
+      onGenerateRoute: (settings) {
+        // Handle deep links here
+        if (settings.name != null) {
+          _handleDeepLink(settings.name!);
+        }
+        return MaterialPageRoute(builder: (context) => HomePage());
+      },
+      home: HomePage(),
+    );
+  }
+
+  Future<void> _handleDeepLink(String url) async {
+    // Handle Insert Affiliate deep links
+    final handled = await insertAffiliateSdk.handleInsertLinks(url);
+    if (handled) {
+      print('Insert Affiliate deep link handled successfully');
+    }
+  }
+}
+```
+
+##### Using go_router (Recommended for Modern Flutter Apps)
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() {
+  // Initialize the SDK
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "your_company_code",
+    verboseLogging: true,
+    insertLinksEnabled: true,
+    insertLinksClipboardEnabled: true,
+  );
+
+  // Set up callback for affiliate identifier changes
+  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+    if (identifier != null) {
+      // Update your attribution services here
+      print('Affiliate identifier updated: $identifier');
+    }
+  });
+
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Insert Affiliate App',
+      routerConfig: _router,
+    );
+  }
+}
+
+final GoRouter _router = GoRouter(
+  routes: <RouteBase>[
+    GoRoute(
+      path: '/',
+      builder: (BuildContext context, GoRouterState state) {
+        return HomePage();
+      },
+    ),
+  ],
+  onException: (context, state, router) {
+    // Handle deep links that don't match any route
+    if (state.uri.toString().isNotEmpty) {
+      _handleDeepLink(state.uri.toString());
+    }
+  },
+);
+
+Future<void> _handleDeepLink(String url) async {
+  final handled = await insertAffiliateSdk.handleInsertLinks(url);
+  if (handled) {
+    print('Insert Affiliate deep link handled successfully');
+  }
+}
+```
+
+**Debugging Deep Links:** Enable [verbose logging](#verbose-logging-optional) during development to see visual confirmation when deep links are processed successfully. This shows detailed logs with the extracted user code, affiliate email, and company information.
+
+#### Retrieving Affiliate Information
+After handling a deep link, you can retrieve the affiliate information:
+
+```dart
+// Get the affiliate identifier
+final affiliateIdentifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+if (affiliateIdentifier != null) {
+  print('Affiliate ID: $affiliateIdentifier');
+}
+```
 
 
 ### Deep Linking with Branch.io

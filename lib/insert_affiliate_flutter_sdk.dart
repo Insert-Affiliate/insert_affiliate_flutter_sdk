@@ -594,6 +594,9 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       return false;
     }
 
+    // Convert short code to uppercase for consistency
+    shortCode = shortCode.toUpperCase();
+    
     print('[Insert Affiliate] Custom URL scheme detected - Company: $companyCode, Short code: $shortCode');
 
     // Validate company code matches initialized one

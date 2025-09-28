@@ -383,7 +383,7 @@ Insert Links by Insert Affiliate supports direct deep linking into your app. Thi
 1. Before you can use Insert Links, you must complete the setup steps in [our docs](https://docs.insertaffiliate.com/insert-links)
 
 2. **Initialization** of the Insert Affiliate SDK with Insert Links
-You must enable *insertLinksEnabled* when [initialising our SDK](!!!!!)
+You must enable *insertLinksEnabled* when [initialising our SDK](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk?tab=readme-ov-file#insert-link-initialization)
 
 3. **Handle Insert Links** in your AppDelegate
 The SDK provides a single `handleInsertLinks` method that automatically detects and handles different URL types. 

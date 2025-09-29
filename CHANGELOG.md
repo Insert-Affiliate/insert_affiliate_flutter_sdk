@@ -1,3 +1,6 @@
+## 1.1.5
+Introducing Insert Links
+
 ## 1.1.4
 AppsFlyer integration documentation and improvements.
 

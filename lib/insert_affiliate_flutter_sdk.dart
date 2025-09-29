@@ -958,7 +958,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
 
     try {
-      const apiUrlString = 'https://64678d5e17ff.ngrok-free.app/V1/appDeepLinkEvents';
+      const apiUrlString = 'https://insertaffiliate.link/V1/appDeepLinkEvents';
       verboseLog('Sending request to: $apiUrlString');
 
       final response = await http.post(

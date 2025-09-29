@@ -454,7 +454,7 @@ void _setupDeepLinkListener() {
   // Listen for incoming links when app returns from background
   appLinks.uriLinkStream.listen((Uri uri) {
     print('Deep link received: $uri');
-    _handleDeepLink(uri.toString());
+    await insertAffiliateSdk.handleDeepLink(uri.toString());
   });
 }
 
@@ -468,12 +468,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-Future<void> _handleDeepLink(String url) async {
-  final handled = await insertAffiliateSdk.handleInsertLinks(url);
-  if (handled) {
-    print('Insert Affiliate deep link handled successfully');
-  }
-}
 ```
 
 **Debugging Deep Links:** Enable [verbose logging](#verbose-logging-optional) during development to see visual confirmation when deep links are processed successfully. This shows detailed logs with the extracted user code, affiliate email, and company information.

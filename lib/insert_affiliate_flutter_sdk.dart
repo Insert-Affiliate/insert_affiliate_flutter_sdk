@@ -830,6 +830,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       systemInfo['platform'] = systemInfo['systemName'];
       systemInfo['os'] = systemInfo['systemName'];
       systemInfo['osVersion'] = systemInfo['systemVersion'];
+      systemInfo['deviceType'] = 'mobile';
 
       // Network info
       final networkInfo = await getNetworkInfo();
@@ -957,7 +958,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
 
     try {
-      const apiUrlString = 'https://insertaffiliate.link/V1/appDeepLinkEvents';
+      const apiUrlString = 'https://64678d5e17ff.ngrok-free.app/V1/appDeepLinkEvents';
       verboseLog('Sending request to: $apiUrlString');
 
       final response = await http.post(

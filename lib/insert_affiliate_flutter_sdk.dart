@@ -13,20 +13,16 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_play_install_referrer/android_play_install_referrer.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-// Callback type definition
 typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier);
 
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
   bool _verboseLogging = false;
   
-  // New state variables for deep link functionality
   bool _insertLinksEnabled = false;
   bool _insertLinksClipboardEnabled = false;
   InsertAffiliateIdentifierChangeCallback? _insertAffiliateIdentifierChangeCallback;
   
-  
-  // Storage keys
   static const String _referrerLinkKey = 'referring_link';
 
   InsertAffiliateFlutterSDK({
@@ -58,7 +54,6 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         captureInstallReferrer();
       }
       
-      // Send enhanced system info for iOS clipboard check
       if (Platform.isIOS) {
         try {
           final enhancedSystemInfo = await getEnhancedSystemInfo();
@@ -514,15 +509,13 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
   // MARK: Public API for handling Insert Links
   Future<bool> handleInsertLinks(String url) async {
-    print('[Insert Affiliate] Attempting to handle URL: $url');
-
     if (url.isEmpty) {
-      print('[Insert Affiliate] Invalid URL provided to handleInsertLinks');
+      verboseLog('Invalid URL provided to handleInsertLinks');
       return false;
     }
 
     if (!_insertLinksEnabled) {
-      print('[Insert Affiliate] Deep links are disabled, not handling URL');
+      verboseLog('Deep links are disabled, not handling URL');
       return false;
     }
 
@@ -597,12 +590,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     // Convert short code to uppercase for consistency
     final upperCaseShortCode = shortCode.toUpperCase();
     
-    print('[Insert Affiliate] Custom URL scheme detected - Company: $companyCode, Short code: $upperCaseShortCode');
+    verboseLog('Custom URL scheme detected - Company: $companyCode, Short code: $upperCaseShortCode');
 
     // Validate company code matches initialized one
     final activeCompanyCode = await getActiveCompanyCode();
     if (activeCompanyCode != null && companyCode.toLowerCase() != activeCompanyCode.toLowerCase()) {
-      print('[Insert Affiliate] Warning: URL company code ($companyCode) doesn\'t match initialized company code ($activeCompanyCode)');
+      verboseLog('Warning: URL company code ($companyCode) doesn\'t match initialized company code ($activeCompanyCode)');
     }
 
     // Store the short code as the referring link

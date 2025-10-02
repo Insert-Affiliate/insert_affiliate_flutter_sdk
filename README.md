@@ -99,6 +99,44 @@ This can be used to quickly identify configuration or setup issues
 
 ⚠️ **Important**: Disable verbose logging in production builds to avoid exposing sensitive debugging information and to optimize performance.
 
+### Insert Link and Clipboard Control (BETA)
+We are currently beta testing our in-house deep linking provider, Insert Links, which generates links for use with your affiliates.
+
+For larger projects where accuracy is critical, we recommend using established third-party deep linking platforms to generate the links you use within Insert Affiliate - such as Appsflyer or Branch.io, as described in the rest of this README.
+
+If you encounter any issues while using Insert Links, please raise an issue on this GitHub repository or contact us directly at michael@insertaffiliate.com
+
+
+#### Insert Link Initialization
+
+```dart
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Initialise Insert Affiliate SDK with deep link support
+    insertAffiliateSdk = InsertAffiliateFlutterSDK(
+        companyCode: "{{ your_company_code }}",
+        verboseLogging: true,  // Enable detailed debugging logs
+        insertLinksEnabled: true,  // Enable deep link processing
+        insertLinksClipboardEnabled: true, // Disable clipboard access to avoid permission prompt
+    ); 
+
+    runApp(MyApp());
+}
+```
+
+**When to use `insertLinksEnabled`:**
+- Set to `true` (default: `false`) if you are using Insert Affiliate's built-in deep link and universal link handling (Insert Links)
+- Set to `false` if you are using an external provider for deep links
+
+**When to use `insertLinksClipboardEnabled`:**
+- Set to `true` (default: `false`) if you are using Insert Affiliate's built-in deep links (Insert Links) **and** would like to improve the effectiveness of our deep links through the clipboard
+- **Important caveat**: This will trigger a system prompt asking the user for permission to access the clipboard when the SDK initializes
+
 
 ## In-App Purchase Setup [Required]
 Insert Affiliate requires a Receipt Verification platform to validate in-app purchases. You must choose **one** of our supported partners:
@@ -334,9 +372,117 @@ void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
 Insert Affiliate requires a Deep Linking platform to create links for your affiliates. Our platform works with **any** deep linking provider, and you only need to follow these steps:
 1. **Create a deep link** in your chosen third-party platform and pass it to our dashboard when an affiliate signs up. 
 2. **Handle deep link clicks** in your app by passing the clicked link:
-   ```flutter
-   insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
-   ```
+  ```flutter
+  insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
+  ```
+
+### Deep Linking with Insert Links
+Insert Links by Insert Affiliate supports deferred deep linking into your app. This allows you to track affiliate attribution when end users are referred to your app by clicking on one of your affiliates Insert Links.
+
+#### Initial Setup
+1. Before you can use Insert Links, you must complete the setup steps in [our docs](https://docs.insertaffiliate.com/insert-links)
+
+2. **Initialization** of the Insert Affiliate SDK with Insert Links
+You must enable *insertLinksEnabled* when [initialising our SDK](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk?tab=readme-ov-file#insert-link-initialization)
+
+3. **Handle Insert Links** in your Flutter App
+The SDK provides a single `handleInsertLinks` method that automatically detects and handles different URL types. 
+
+#### Flutter App Integration
+
+For Flutter apps, you can handle Insert Links using the `app_links` package, which properly handles deep links when the app returns from background. This is the recommended approach for reliable deep link handling.
+
+##### Example Using app_links (Recommended for Deep Link Handling)
+
+**1. Add app_links dependency to pubspec.yaml:**
+
+```yaml
+dependencies:
+  app_links: ^6.3.2  # Add this line
+```
+
+**2. Import app_links in your main.dart:**
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:app_links/app_links.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize SDK
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "your_company_code",
+    verboseLogging: true,
+    insertLinksEnabled: true,
+    insertLinksClipboardEnabled: true,
+  );
+
+  // Set up callback for affiliate identifier changes
+  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+    if (identifier != null) {
+      // *** Required if using RevenueCat *** //
+      // Purchases.setAttributes({"insert_affiliate": identifier});
+      // *** End of RevenueCat section *** //
+
+      // *** Required if using Apphud *** //
+      // Apphud.setUserProperty(key: "insert_affiliate", value: identifier, setOnce: false);
+      // *** End of Apphud Section *** //
+
+      // *** Required only if you're using Iaptic ** //
+      // InAppPurchase.initialize(
+      //   iapProducts: iapProductsArray,
+      //   validatorUrlString: "https://validator.iaptic.com/v3/validate?appName={{ your_iaptic_app_name }}&apiKey={{ your_iaptic_app_key_goes_here }}",
+      //   applicationUsername: identifier
+      // );
+      // *** End of Iaptic Section ** //
+    }
+  });
+
+  // CRITICAL: Set up deep link listener for background returns
+  _setupDeepLinkListener();
+
+  runApp(MyApp());
+}
+
+void _setupDeepLinkListener() {
+  final appLinks = AppLinks();
+
+  // Listen for incoming links when app returns from background
+  appLinks.uriLinkStream.listen((Uri uri) {
+    print('Deep link received: $uri');
+    await insertAffiliateSdk.handleDeepLink(uri.toString());
+  });
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Insert Affiliate App',
+      home: HomePage(),
+    );
+  }
+}
+
+```
+
+**Debugging Deep Links:** Enable [verbose logging](#verbose-logging-optional) during development to see visual confirmation when deep links are processed successfully. This shows detailed logs with the extracted user code, affiliate email, and company information.
+
+#### Retrieving Affiliate Information
+After handling a deep link, you can retrieve the affiliate information:
+
+```dart
+// Get the affiliate identifier
+final affiliateIdentifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+if (affiliateIdentifier != null) {
+  print('Affiliate ID: $affiliateIdentifier');
+}
+```
+
 
 ### Deep Linking with Branch.io
 To set up deep linking with Branch.io, follow these steps:
@@ -400,6 +546,11 @@ dependencies:
 2. **Configure manifest** for OneLink deep linking in `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
+<!-- Add these permissions at the top of the AndroidManifest.xml file -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="com.android.vending.INSTALL_REFERRER" />
+
 <activity android:name=".MainActivity" android:exported="true">
     <!-- OneLink deep linking -->
     <intent-filter android:autoVerify="true">
@@ -429,6 +580,9 @@ dependencies:
 <array>
     <string>applinks:{{ONELINK_SUBDOMAIN}}.onelink.me</string>
 </array>
+<!-- Add this permission for clipboard access (required for insertLinksClipboardEnabled) -->
+<key>NSPasteboardGeneralUseDescription</key>
+<string>This app needs clipboard access to detect affiliate links</string>
 ```
 
 #### Initialize AppsFlyer and the SDK

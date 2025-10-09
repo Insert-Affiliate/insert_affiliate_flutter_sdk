@@ -21,6 +21,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   
   bool _insertLinksEnabled = false;
   bool _insertLinksClipboardEnabled = false;
+  int _attributionTimeoutDays = 0;
   InsertAffiliateIdentifierChangeCallback? _insertAffiliateIdentifierChangeCallback;
   
   static const String _referrerLinkKey = 'referring_link';
@@ -30,9 +31,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     bool verboseLogging = false,
     bool insertLinksEnabled = false,
     bool insertLinksClipboardEnabled = false,
+    int attributionTimeoutDays = 0,
   }) : _verboseLogging = verboseLogging,
        _insertLinksEnabled = insertLinksEnabled,
-       _insertLinksClipboardEnabled = insertLinksClipboardEnabled {
+       _insertLinksClipboardEnabled = insertLinksClipboardEnabled,
+       _attributionTimeoutDays = attributionTimeoutDays {
     _init();
   }
 
@@ -43,6 +46,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       print('[Insert Affiliate] [VERBOSE] Verbose logging enabled');
       print('[Insert Affiliate] [VERBOSE] Insert links enabled: $_insertLinksEnabled');
       print('[Insert Affiliate] [VERBOSE] Clipboard enabled: $_insertLinksClipboardEnabled');
+      print('[Insert Affiliate] [VERBOSE] Attribution timeout days: $_attributionTimeoutDays');
+    }
+    
+    // Set the attribution timeout in SharedPreferences if provided
+    if (_attributionTimeoutDays > 0) {
+      await setAffiliateAttributionTimeoutDays(_attributionTimeoutDays);
     }
     
     await _storeAndReturnShortUniqueDeviceId();
@@ -184,7 +193,22 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     print('[Insert Affiliate] Storing affiliate identifier: $referringLink');
     verboseLog('Saving referrer link to SharedPreferences...');
     final prefs = await SharedPreferences.getInstance();
+    
+    // Check if the referrer link is different from what's already stored
+    final existingLink = prefs.getString('referring_link');
+    final isNewOrDifferent = existingLink != referringLink;
+    
     await prefs.setString('referring_link', referringLink);
+    
+    // Only store the attribution date if this is a new or different affiliate identifier
+    if (isNewOrDifferent) {
+      final attributionDate = DateTime.now().toIso8601String();
+      await prefs.setString('affiliate_attribution_date', attributionDate);
+      verboseLog('New affiliate identifier stored with fresh attribution date');
+    } else {
+      verboseLog('Same affiliate identifier, preserving existing attribution date');
+    }
+    
     verboseLog('Referrer link saved to SharedPreferences successfully');
 
     verboseLog('Attempting to fetch offer code for stored affiliate identifier...');
@@ -192,7 +216,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> returnInsertAffiliateIdentifier() async {
+  Future<String?> returnInsertAffiliateIdentifier({bool ignoreTimeout = false}) async {
     verboseLog('Getting insert affiliate identifier...');
     final prefs = await SharedPreferences.getInstance();
     final referringLink = prefs.getString('referring_link');
@@ -205,9 +229,98 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       return null;
     }
     
+    // Check attribution validity unless ignoreTimeout is true
+    if (!ignoreTimeout && !await isAffiliateAttributionValid()) {
+      verboseLog('Affiliate attribution has expired');
+      return null;
+    }
+    
     final identifier = "$referringLink-$shortUniqueDeviceID";
     verboseLog('Found identifier: $identifier');
     return identifier;
+  }
+
+  /// Checks if the affiliate attribution is still valid based on the timeout period.
+  /// Returns true if attribution is valid or no timeout is set, false if expired.
+  Future<bool> isAffiliateAttributionValid() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Get the stored attribution date
+      final storedDateString = prefs.getString('affiliate_attribution_date');
+      if (storedDateString == null) {
+        verboseLog('No attribution date found, considering valid for backward compatibility');
+        return true; // For backward compatibility, consider valid if no date is stored
+      }
+      
+      // Get the timeout period (default to 0 = disabled if not set)
+      final timeoutDays = prefs.getInt('affiliate_attribution_timeout_days') ?? 0;
+      if (timeoutDays <= 0) {
+        verboseLog('Attribution timeout disabled (timeout days <= 0)');
+        return true; // If timeout is disabled, always valid
+      }
+      
+      final storedDate = DateTime.parse(storedDateString);
+      final now = DateTime.now();
+      final daysSinceAttribution = now.difference(storedDate).inDays;
+      
+      final isValid = daysSinceAttribution <= timeoutDays;
+      verboseLog('Attribution check: stored=${storedDate.toIso8601String()}, '
+                'timeout=${timeoutDays}d, daysSince=${daysSinceAttribution}d, valid=$isValid');
+      
+      return isValid;
+    } catch (error) {
+      verboseLog('Error checking attribution validity: $error');
+      return true; // Default to valid on error for backward compatibility
+    }
+  }
+
+  /// Returns the date when the affiliate attribution was stored.
+  /// Returns null if no attribution date is found.
+  Future<DateTime?> getAffiliateStoredDate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedDateString = prefs.getString('affiliate_attribution_date');
+      
+      if (storedDateString != null) {
+        final storedDate = DateTime.parse(storedDateString);
+        verboseLog('Retrieved affiliate stored date: ${storedDate.toIso8601String()}');
+        return storedDate;
+      } else {
+        verboseLog('No affiliate stored date found');
+        return null;
+      }
+    } catch (error) {
+      verboseLog('Error retrieving affiliate stored date: $error');
+      return null;
+    }
+  }
+
+  /// Sets the timeout period in days for affiliate attribution.
+  /// Set to 0 or negative value to disable timeout (attribution never expires).
+  /// Default is 30 days if not explicitly set.
+  Future<void> setAffiliateAttributionTimeoutDays(int timeoutDays) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('affiliate_attribution_timeout_days', timeoutDays);
+      verboseLog('Attribution timeout set to $timeoutDays days');
+    } catch (error) {
+      verboseLog('Error setting attribution timeout: $error');
+    }
+  }
+
+  /// Gets the current timeout period in days for affiliate attribution.
+  /// Returns the default of 0 (disabled) if not explicitly set.
+  Future<int> getAffiliateAttributionTimeoutDays() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timeoutDays = prefs.getInt('affiliate_attribution_timeout_days') ?? 0;
+      verboseLog('Current attribution timeout: $timeoutDays days');
+      return timeoutDays;
+    } catch (error) {
+      verboseLog('Error getting attribution timeout: $error');
+      return 0; // Default fallback (disabled)
+    }
   }
 
   Future<void> storeExpectedStoreTransaction(String purchaseToken) async {
@@ -1001,7 +1114,22 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     verboseLog('Updating state with referrer link: $link');
     final prefs = await SharedPreferences.getInstance();
     verboseLog('Saving referrer link to storage...');
+    
+    // Check if the referrer link is different from what's already stored
+    final existingLink = prefs.getString(_referrerLinkKey);
+    final isNewOrDifferent = existingLink != link;
+    
     await prefs.setString(_referrerLinkKey, link);
+    
+    // Only store the attribution date if this is a new or different affiliate identifier
+    if (isNewOrDifferent) {
+      final attributionDate = DateTime.now().toIso8601String();
+      await prefs.setString('affiliate_attribution_date', attributionDate);
+      verboseLog('New affiliate identifier stored with fresh attribution date');
+    } else {
+      verboseLog('Same affiliate identifier, preserving existing attribution date');
+    }
+    
     verboseLog('Referrer link saved to storage successfully');
 
     // Automatically fetch and store offer code
@@ -1010,7 +1138,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     // Trigger callback with the current affiliate identifier
     if (_insertAffiliateIdentifierChangeCallback != null) {
-      final currentIdentifier = await returnInsertAffiliateIdentifier();
+      final currentIdentifier = await returnInsertAffiliateIdentifier(ignoreTimeout: true);
       verboseLog('Triggering callback with identifier: $currentIdentifier');
       _insertAffiliateIdentifierChangeCallback!(currentIdentifier);
     }

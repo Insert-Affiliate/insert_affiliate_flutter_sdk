@@ -20,7 +20,7 @@ dependencies:
   connectivity_plus: ^3.0.0
   device_info_plus: ^9.0.0
   android_play_install_referrer: ^0.3.0
-  package_info_plus: ^4.0.0
+  package_info_plus: ^8.1.0
 
 dev_dependencies:
   flutter_test:

@@ -774,14 +774,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       systemInfo['userAgent'] = '$model; $systemName $systemVersion';
 
       // Screen dimensions
-      final window = WidgetsBinding.instance.window;
-      final screenSize = window.physicalSize / window.devicePixelRatio;
+      final view = WidgetsBinding.instance.platformDispatcher.views.first;
+      final screenSize = view.physicalSize / view.devicePixelRatio;
 
       systemInfo['screenWidth'] = screenSize.width.floor();
       systemInfo['screenHeight'] = screenSize.height.floor();
       systemInfo['screenAvailWidth'] = screenSize.width.floor();
       systemInfo['screenAvailHeight'] = screenSize.height.floor();
-      systemInfo['devicePixelRatio'] = window.devicePixelRatio;
+      systemInfo['devicePixelRatio'] = view.devicePixelRatio;
       systemInfo['screenColorDepth'] = 24;
       systemInfo['screenPixelDepth'] = 24;
 
@@ -910,14 +910,15 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     };
 
     try {
-      final connectivityResult = await Connectivity().checkConnectivity();
+      final connectivityResults = await Connectivity().checkConnectivity();
+      final connectivityResult = connectivityResults.isNotEmpty ? connectivityResults.first : ConnectivityResult.none;
 
       connectionInfo['status'] = connectivityResult != ConnectivityResult.none ? 'connected' : 'disconnected';
       connectionInfo['connectionType'] = _mapConnectivityResult(connectivityResult);
 
       if (connectivityResult != ConnectivityResult.none) {
-        connectionInfo['interfaceTypes'] = [_mapConnectivityResult(connectivityResult)];
-        connectionInfo['availableInterfaces'] = [_mapConnectivityResult(connectivityResult)];
+        connectionInfo['interfaceTypes'] = connectivityResults.map(_mapConnectivityResult).toList();
+        connectionInfo['availableInterfaces'] = connectivityResults.map(_mapConnectivityResult).toList();
       }
     } catch (error) {
       verboseLog('Network info fetch failed: $error');

@@ -1,3 +1,15 @@
+## 1.1.8
+Major dependency update with SDK upgrade:
+- Updated Dart SDK requirement to >=3.9.0
+- device_info_plus: ^12.1.0 (from ^10.1.2) - now fully up-to-date
+- connectivity_plus: ^6.1.0 (from ^5.0.2) 
+- in_app_purchase: ^3.2.3 (from ^3.2.0)
+- in_app_purchase_storekit: ^0.4.6 (from ^0.3.20)
+- shared_preferences: ^2.5.3 (from ^2.3.2)
+- url_launcher: ^6.3.2 (from ^6.3.1)
+- package_info_plus: ^9.0.0 (from ^8.1.0)
+- flutter_lints: ^6.0.0 (from ^3.0.0)
+
 ## 1.1.7
 Updated dependencies to latest versions, including:
 - http: ^1.2.2 (from ^0.13.5)

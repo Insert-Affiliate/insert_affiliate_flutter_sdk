@@ -1,3 +1,18 @@
+## 1.2.0
+Major feature release: Attribution Timeout + Dependency Updates
+- NEW: Attribution timeout functionality with seconds precision
+- NEW: `attributionTimeout` parameter in SDK constructor
+- NEW: `setAffiliateAttributionTimeout()` and `getAffiliateAttributionTimeout()` methods
+- NEW: `isAffiliateAttributionValid()` method to check attribution validity
+- NEW: `getAffiliateStoredDate()` method to retrieve attribution date
+- NEW: `returnInsertAffiliateIdentifier(ignoreTimeout: true)` parameter for testing
+- Enhanced: Attribution dates are now tracked automatically
+- Enhanced: Backward compatibility maintained for existing attributions
+- Updated: All dependencies from v1.1.8 merged (latest versions)
+- Updated: Dart SDK requirement to >=3.9.0
+- Fixed: Connectivity API compatibility for new connectivity_plus version
+- Fixed: Deprecated window usage replaced with platformDispatcher
+
 ## 1.1.8
 Major dependency update with SDK upgrade:
 - Updated Dart SDK requirement to >=3.9.0

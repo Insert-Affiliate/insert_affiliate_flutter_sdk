@@ -122,7 +122,8 @@ void main() async {
         companyCode: "{{ your_company_code }}",
         verboseLogging: true,  // Enable detailed debugging logs
         insertLinksEnabled: true,  // Enable deep link processing
-        insertLinksClipboardEnabled: true, // Disable clipboard access to avoid permission prompt
+        insertLinksClipboardEnabled: true, // Enable clipboard access for improved attribution (triggers permission prompt)
+        attributionTimeout: 2592000, // Set attribution timeout to 30 days in seconds (0 = disabled, default)
     ); 
 
     runApp(MyApp());
@@ -1159,3 +1160,78 @@ class _NativeIAPPurchaseViewState extends State<NativeIAPPurchaseView> {
 3. **Fallback Logic**: Always implement fallback to base products if promotional ones aren't available
 4. **User Experience**: Clearly indicate when special pricing is applied
 5. **Testing**: Test both scenarios - with and without offer codes applied
+
+## Attribution Timeout
+
+The Insert Affiliate Flutter SDK now supports attribution timeout functionality, allowing you to set how long an affiliate link attribution remains active before expiring. This feature helps you control the attribution window for affiliate commissions.
+
+### How Attribution Timeout Works
+
+By default, affiliate attributions **never expire** (timeout is disabled). When a timeout is configured, attributions remain active for the specified number of seconds from when they were first set. After this period, the SDK will return `null` when calling `returnInsertAffiliateIdentifier()`, effectively expiring the attribution and preventing affiliate commissions for subsequent purchases.
+
+### Configuration
+
+#### Setting the Attribution Timeout
+
+You can configure the attribution timeout period using the `setAffiliateAttributionTimeout` method:
+
+```dart
+// Set attribution timeout to 7 days (604800 seconds)
+await insertAffiliateSdk.setAffiliateAttributionTimeout(604800);
+
+// Set attribution timeout to 60 days (5184000 seconds)
+await insertAffiliateSdk.setAffiliateAttributionTimeout(5184000);
+
+// Disable attribution timeout (never expires)
+await insertAffiliateSdk.setAffiliateAttributionTimeout(0);
+```
+
+#### Getting the Current Timeout Setting
+
+You can retrieve the current timeout setting:
+
+```dart
+final timeoutSeconds = await insertAffiliateSdk.getAffiliateAttributionTimeout();
+print('Attribution expires after $timeoutSeconds seconds');
+```
+
+### Checking Attribution Validity
+
+You can check if the current attribution is still valid:
+
+```dart
+final isValid = await insertAffiliateSdk.isAffiliateAttributionValid();
+if (isValid) {
+  print('Attribution is still active');
+} else {
+  print('Attribution has expired');
+}
+```
+
+### Getting Attribution Date
+
+You can retrieve when the attribution was first stored:
+
+```dart
+final storedDate = await insertAffiliateSdk.getAffiliateStoredDate();
+if (storedDate != null) {
+  print('Attribution was set on: ${storedDate.toLocal()}');
+}
+```
+
+### Bypassing Timeout for Testing
+
+When developing or testing, you may need to retrieve the affiliate identifier even if it has expired. Use the `ignoreTimeout` parameter:
+
+```dart
+// This will return the identifier even if attribution has expired
+final identifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier(ignoreTimeout: true);
+```
+
+### Important Notes
+
+1. **Default Behavior**: If no timeout is explicitly set, the default is disabled (0 = never expires)
+2. **Disabled Timeout**: Setting timeout to 0 or negative value disables the timeout (attribution never expires)
+3. **Backward Compatibility**: Existing attributions without stored dates are considered valid for backward compatibility
+4. **Attribution Reset**: Setting a new or different affiliate identifier will reset the attribution date
+5. **Same Identifier**: Re-setting the same affiliate identifier will preserve the original attribution date

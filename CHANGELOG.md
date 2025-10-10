@@ -1,3 +1,16 @@
+## 1.1.7
+Updated dependencies to latest versions, including:
+- http: ^1.2.2 (from ^0.13.5)
+- shared_preferences: ^2.3.2 (from ^2.0.13)
+- url_launcher: ^6.3.1 (from ^6.1.0)
+- connectivity_plus: ^5.0.2 (from ^3.0.0)
+- device_info_plus: ^10.1.2 (from ^9.0.0)
+- android_play_install_referrer: ^0.4.0 (from ^0.3.0)
+- in_app_purchase: ^3.2.0 (from >=2.0.0 <4.0.0)
+
+## 1.1.6
+Package info plus dependency update
+
 ## 1.1.5
 Introducing Insert Links
 

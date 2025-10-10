@@ -1171,9 +1171,33 @@ By default, affiliate attributions **never expire** (timeout is disabled). When 
 
 ### Configuration
 
-#### Setting the Attribution Timeout
+#### Setting the Attribution Timeout During Initialization (Recommended)
 
-You can configure the attribution timeout period using the `setAffiliateAttributionTimeout` method:
+You can configure the attribution timeout period during SDK initialization:
+
+```dart
+// Set attribution timeout to 7 days (604800 seconds)
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "{{ your_company_code }}",
+  attributionTimeout: 604800, // 7 days in seconds
+);
+
+// Set attribution timeout to 60 days (5184000 seconds)  
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "{{ your_company_code }}",
+  attributionTimeout: 5184000, // 60 days in seconds
+);
+
+// Disable attribution timeout (never expires) - this is the default
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "{{ your_company_code }}",
+  attributionTimeout: 0, // Never expires (default)
+);
+```
+
+#### Runtime Attribution Timeout Updates
+
+You can also update the attribution timeout at runtime using the `setAffiliateAttributionTimeout` method:
 
 ```dart
 // Set attribution timeout to 7 days (604800 seconds)

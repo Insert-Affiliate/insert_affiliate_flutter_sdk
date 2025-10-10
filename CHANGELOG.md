@@ -1,3 +1,9 @@
+## 1.2.1
+Documentation update:
+- Fixed: README.md attribution timeout documentation now correctly shows initialization method as recommended approach
+- Enhanced: Added runtime configuration method as secondary option for attribution timeout
+- Clarified: Attribution timeout configuration best practices
+
 ## 1.2.0
 Major feature release: Attribution Timeout + Dependency Updates
 - NEW: Attribution timeout functionality with seconds precision

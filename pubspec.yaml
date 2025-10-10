@@ -6,26 +6,26 @@ repository: https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk
 issue_tracker: https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk/issues
 
 environment:
-  sdk: '>=3.4.4 <4.0.0'
+  sdk: '>=3.9.0 <4.0.0'
   flutter: ">=1.17.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  in_app_purchase: ">=2.0.0 <4.0.0"
-  in_app_purchase_storekit: ^0.3.20 
-  http: ^0.13.5
-  shared_preferences: ^2.0.13
-  url_launcher: ^6.1.0
-  connectivity_plus: ^3.0.0
-  device_info_plus: ^9.0.0
-  android_play_install_referrer: ^0.3.0
-  package_info_plus: ^4.0.0
+  in_app_purchase: ^3.2.3
+  in_app_purchase_storekit: ^0.4.6 
+  http: ^1.2.2
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.2
+  connectivity_plus: ^6.1.0
+  device_info_plus: ^12.1.0
+  android_play_install_referrer: ^0.4.0
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

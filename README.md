@@ -123,7 +123,7 @@ void main() async {
         verboseLogging: true,  // Enable detailed debugging logs
         insertLinksEnabled: true,  // Enable deep link processing
         insertLinksClipboardEnabled: true, // Enable clipboard access for improved attribution (triggers permission prompt)
-        attributionTimeoutDays: 30, // Set attribution timeout to 30 days (0 = disabled, default)
+        attributionTimeout: 2592000, // Set attribution timeout to 30 days in seconds (0 = disabled, default)
     ); 
 
     runApp(MyApp());
@@ -1167,23 +1167,23 @@ The Insert Affiliate Flutter SDK now supports attribution timeout functionality,
 
 ### How Attribution Timeout Works
 
-By default, affiliate attributions **never expire** (timeout is disabled). When a timeout is configured, attributions remain active for the specified number of days from when they were first set. After this period, the SDK will return `null` when calling `returnInsertAffiliateIdentifier()`, effectively expiring the attribution and preventing affiliate commissions for subsequent purchases.
+By default, affiliate attributions **never expire** (timeout is disabled). When a timeout is configured, attributions remain active for the specified number of seconds from when they were first set. After this period, the SDK will return `null` when calling `returnInsertAffiliateIdentifier()`, effectively expiring the attribution and preventing affiliate commissions for subsequent purchases.
 
 ### Configuration
 
 #### Setting the Attribution Timeout
 
-You can configure the attribution timeout period using the `setAffiliateAttributionTimeoutDays` method:
+You can configure the attribution timeout period using the `setAffiliateAttributionTimeout` method:
 
 ```dart
-// Set attribution timeout to 7 days
-await insertAffiliateSdk.setAffiliateAttributionTimeoutDays(7);
+// Set attribution timeout to 7 days (604800 seconds)
+await insertAffiliateSdk.setAffiliateAttributionTimeout(604800);
 
-// Set attribution timeout to 60 days
-await insertAffiliateSdk.setAffiliateAttributionTimeoutDays(60);
+// Set attribution timeout to 60 days (5184000 seconds)
+await insertAffiliateSdk.setAffiliateAttributionTimeout(5184000);
 
 // Disable attribution timeout (never expires)
-await insertAffiliateSdk.setAffiliateAttributionTimeoutDays(0);
+await insertAffiliateSdk.setAffiliateAttributionTimeout(0);
 ```
 
 #### Getting the Current Timeout Setting
@@ -1191,8 +1191,8 @@ await insertAffiliateSdk.setAffiliateAttributionTimeoutDays(0);
 You can retrieve the current timeout setting:
 
 ```dart
-final timeoutDays = await insertAffiliateSdk.getAffiliateAttributionTimeoutDays();
-print('Attribution expires after $timeoutDays days');
+final timeoutSeconds = await insertAffiliateSdk.getAffiliateAttributionTimeout();
+print('Attribution expires after $timeoutSeconds seconds');
 ```
 
 ### Checking Attribution Validity

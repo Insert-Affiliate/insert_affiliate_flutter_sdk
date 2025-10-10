@@ -21,7 +21,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   
   bool _insertLinksEnabled = false;
   bool _insertLinksClipboardEnabled = false;
-  int _attributionTimeoutDays = 0;
+  int _attributionTimeout = 0;
   InsertAffiliateIdentifierChangeCallback? _insertAffiliateIdentifierChangeCallback;
   
   static const String _referrerLinkKey = 'referring_link';
@@ -31,11 +31,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     bool verboseLogging = false,
     bool insertLinksEnabled = false,
     bool insertLinksClipboardEnabled = false,
-    int attributionTimeoutDays = 0,
+    int attributionTimeout = 0,
   }) : _verboseLogging = verboseLogging,
        _insertLinksEnabled = insertLinksEnabled,
        _insertLinksClipboardEnabled = insertLinksClipboardEnabled,
-       _attributionTimeoutDays = attributionTimeoutDays {
+       _attributionTimeout = attributionTimeout {
     _init();
   }
 
@@ -46,12 +46,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       print('[Insert Affiliate] [VERBOSE] Verbose logging enabled');
       print('[Insert Affiliate] [VERBOSE] Insert links enabled: $_insertLinksEnabled');
       print('[Insert Affiliate] [VERBOSE] Clipboard enabled: $_insertLinksClipboardEnabled');
-      print('[Insert Affiliate] [VERBOSE] Attribution timeout days: $_attributionTimeoutDays');
+      print('[Insert Affiliate] [VERBOSE] Attribution timeout: $_attributionTimeout');
     }
     
     // Set the attribution timeout in SharedPreferences if provided
-    if (_attributionTimeoutDays > 0) {
-      await setAffiliateAttributionTimeoutDays(_attributionTimeoutDays);
+    if (_attributionTimeout > 0) {
+      await setAffiliateAttributionTimeout(_attributionTimeout);
     }
     
     await _storeAndReturnShortUniqueDeviceId();
@@ -254,19 +254,19 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
       
       // Get the timeout period (default to 0 = disabled if not set)
-      final timeoutDays = prefs.getInt('affiliate_attribution_timeout_days') ?? 0;
-      if (timeoutDays <= 0) {
-        verboseLog('Attribution timeout disabled (timeout days <= 0)');
+      final timeoutSeconds = prefs.getInt('affiliate_attribution_timeout_seconds') ?? 0;
+      if (timeoutSeconds <= 0) {
+        verboseLog('Attribution timeout disabled (timeout seconds <= 0)');
         return true; // If timeout is disabled, always valid
       }
       
       final storedDate = DateTime.parse(storedDateString);
       final now = DateTime.now();
-      final daysSinceAttribution = now.difference(storedDate).inDays;
+      final secondsSinceAttribution = now.difference(storedDate).inSeconds;
       
-      final isValid = daysSinceAttribution <= timeoutDays;
+      final isValid = secondsSinceAttribution <= timeoutSeconds;
       verboseLog('Attribution check: stored=${storedDate.toIso8601String()}, '
-                'timeout=${timeoutDays}d, daysSince=${daysSinceAttribution}d, valid=$isValid');
+                'timeout=${timeoutSeconds}s, secondsSince=${secondsSinceAttribution}s, valid=$isValid');
       
       return isValid;
     } catch (error) {
@@ -296,27 +296,26 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
-  /// Sets the timeout period in days for affiliate attribution.
+  /// Sets the timeout period in seconds for affiliate attribution.
   /// Set to 0 or negative value to disable timeout (attribution never expires).
-  /// Default is 30 days if not explicitly set.
-  Future<void> setAffiliateAttributionTimeoutDays(int timeoutDays) async {
+  Future<void> setAffiliateAttributionTimeout(int timeoutSeconds) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('affiliate_attribution_timeout_days', timeoutDays);
-      verboseLog('Attribution timeout set to $timeoutDays days');
+      await prefs.setInt('affiliate_attribution_timeout_seconds', timeoutSeconds);
+      verboseLog('Attribution timeout set to $timeoutSeconds seconds');
     } catch (error) {
       verboseLog('Error setting attribution timeout: $error');
     }
   }
 
-  /// Gets the current timeout period in days for affiliate attribution.
+  /// Gets the current timeout period in seconds for affiliate attribution.
   /// Returns the default of 0 (disabled) if not explicitly set.
-  Future<int> getAffiliateAttributionTimeoutDays() async {
+  Future<int> getAffiliateAttributionTimeout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final timeoutDays = prefs.getInt('affiliate_attribution_timeout_days') ?? 0;
-      verboseLog('Current attribution timeout: $timeoutDays days');
-      return timeoutDays;
+      final timeoutSeconds = prefs.getInt('affiliate_attribution_timeout_seconds') ?? 0;
+      verboseLog('Current attribution timeout: $timeoutSeconds seconds');
+      return timeoutSeconds;
     } catch (error) {
       verboseLog('Error getting attribution timeout: $error');
       return 0; // Default fallback (disabled)

@@ -452,12 +452,24 @@ void main() async {
 void _setupDeepLinkListener() {
   final appLinks = AppLinks();
 
+  // Check for initial link (fresh install/launch)
+  try {
+    final initialLink = await appLinks.getInitialLink();
+    if (initialLink != null) {
+      print('Initial deep link received: $initialLink');
+      await insertAffiliateSdk.handleDeepLink(initialLink.toString());
+    }
+  } catch (e) {
+    print('Failed to get initial link: $e');
+  }
+
   // Listen for incoming links when app returns from background
   appLinks.uriLinkStream.listen((Uri uri) {
     print('Deep link received: $uri');
     await insertAffiliateSdk.handleDeepLink(uri.toString());
   });
 }
+
 
 class MyApp extends StatelessWidget {
   @override

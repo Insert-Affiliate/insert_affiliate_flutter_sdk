@@ -758,27 +758,218 @@ late final InsertAffiliateFlutterSDK insertAffiliateSdk;
 insertAffiliateSdk.setShortCode("B2SC6VRSKQ")
 ```
 
-### Setting a Short Code
+### Getting Affiliate Details
 
-Use the `setShortCode` method to associate a short code with an affiliate. This is ideal for scenarios where users enter the code via an input field, pop-up, or similar UI element.
+You can retrieve detailed information about an affiliate by their short code or deep link using the `getAffiliateDetails` method. This is useful for displaying affiliate information to users or showing personalized content based on the referrer.
 
-Short codes must meet the following criteria:
-- Between **3 and 25 characters long**.
-- Contain only **letters and numbers** (alphanumeric characters).
-- Replace {{ user_entered_short_code }} with the short code the user enters through your chosen input method, i.e. an input field / pop up element
-
-
-#### Example Integration
-Below is an example SwiftUI implementation where users can enter a short code, which will be validated and associated with the affiliate's account:
+#### Method Signature
 
 ```dart
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+Future<AffiliateDetails?> getAffiliateDetails(String affiliateCode)
 
-ElevatedButton(
-    onPressed: () => insertAffiliateSdk.setShortCode("B2SC6VRSKQ"),
-    child: Text("Set Short Code"),
-)
+class AffiliateDetails {
+  final String affiliateName;
+  final String affiliateShortCode;
+  final String deeplinkUrl;
+}
 ```
+
+#### Usage Example
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class MyWidget extends StatefulWidget {
+  @override
+  _MyWidgetState createState() => _MyWidgetState();
+}
+
+class _MyWidgetState extends State<MyWidget> {
+  String? affiliateName;
+
+  Future<void> handleGetAffiliateInfo(String code) async {
+    final details = await insertAffiliateSdk.getAffiliateDetails(code);
+
+    if (details != null) {
+      print('Affiliate Name: ${details.affiliateName}');
+      print('Short Code: ${details.affiliateShortCode}');
+      print('Deep Link: ${details.deeplinkUrl}');
+
+      // Update UI with affiliate name
+      setState(() {
+        affiliateName = details.affiliateName;
+      });
+    } else {
+      print('Affiliate not found');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (affiliateName != null)
+          Text('Referred by: $affiliateName'),
+
+        ElevatedButton(
+          onPressed: () => handleGetAffiliateInfo('JOIN123'),
+          child: Text('Get Affiliate Info'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+#### Return Value
+
+Returns an `AffiliateDetails` object with affiliate information if the code exists:
+- `affiliateName`: The name of the affiliate
+- `affiliateShortCode`: The affiliate's short code
+- `deeplinkUrl`: The affiliate's deep link URL
+
+Returns `null` if:
+- The affiliate code doesn't exist
+- The company code is not initialized
+- There's a network error or API issue
+
+#### Important Notes
+
+- This method **does not store or set** the affiliate identifier - it only retrieves information
+- Use `setShortCode()` to actually associate an affiliate with a user
+- The method automatically strips UUIDs from codes (e.g., "ABC123-uuid" becomes "ABC123")
+- Works with both short codes and deep link URLs
+
+#### Getting the Stored Affiliate Identifier
+
+To retrieve the currently stored affiliate identifier (the one associated with the current user), use `returnInsertAffiliateIdentifier()`:
+
+```dart
+// Get the current affiliate identifier
+final affiliateIdentifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+if (affiliateIdentifier != null) {
+  print('Current affiliate identifier: $affiliateIdentifier');
+} else {
+  print('No affiliate identifier found');
+}
+```
+
+**Important Notes:**
+- This method should only be called after SDK initialization is complete
+- Returns `null` if no affiliate identifier has been set
+- Respects the attribution timeout if configured (see [Attribution Timeout](#attribution-timeout))
+- The identifier is automatically stored when a user clicks an affiliate link or enters a short code
+
+### Setting a Short Code
+
+Use the `setShortCode` method to validate and associate a short code with an affiliate. This is ideal for scenarios where users enter the code via an input field, pop-up, or similar UI element.
+
+#### Method Signature
+
+```dart
+Future<bool> setShortCode(String shortCode)
+```
+
+#### Return Value
+
+`setShortCode` returns a `bool`:
+- Returns **`true`** if the short code exists and was successfully validated and stored
+- Returns **`false`** if the short code does not exist or validation failed
+
+This allows you to provide immediate feedback to users about whether their entered code is valid.
+
+#### Short Code Requirements
+
+Short codes must meet the following criteria:
+- Between **3 and 25 characters long**
+- Contain only **letters and numbers** (alphanumeric characters)
+
+#### Basic Usage
+
+```dart
+// Basic usage (without validation feedback)
+final success = await insertAffiliateSdk.setShortCode('JOIN123');
+```
+
+#### Recommended Usage with Validation Feedback
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class ShortCodeView extends StatefulWidget {
+  @override
+  _ShortCodeViewState createState() => _ShortCodeViewState();
+}
+
+class _ShortCodeViewState extends State<ShortCodeView> {
+  final TextEditingController _controller = TextEditingController();
+  String? alertTitle;
+  String? alertMessage;
+  bool showAlert = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text('Enter your Short Code', style: TextStyle(fontSize: 18)),
+        SizedBox(height: 10),
+
+        TextField(
+          controller: _controller,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Short Code',
+          ),
+          textCapitalization: TextCapitalization.characters,
+        ),
+        SizedBox(height: 10),
+
+        ElevatedButton(
+          onPressed: () async {
+            final isValid = await insertAffiliateSdk.setShortCode(_controller.text);
+
+            setState(() {
+              if (isValid) {
+                alertTitle = 'Success';
+                alertMessage = 'Affiliate code applied successfully!';
+              } else {
+                alertTitle = 'Error';
+                alertMessage = 'Invalid affiliate code. Please check and try again.';
+              }
+              showAlert = true;
+            });
+
+            // Show dialog
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(alertTitle!),
+                content: Text(alertMessage!),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          },
+          child: Text('Set Short Code'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+#### Important Notes
+
+- The method validates the short code against the Insert Affiliate API before storing it
+- Validation checks both format (length, alphanumeric) and existence in your affiliate database
+- Short codes are automatically converted to uppercase
+- Use the return value to show success/error messages to your users
 
 ### 3. Discounts for Users → Offer Codes / Dynamic Product IDs
 

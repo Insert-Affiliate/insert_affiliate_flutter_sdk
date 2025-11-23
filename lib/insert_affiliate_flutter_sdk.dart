@@ -15,6 +15,19 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier);
 
+/// Affiliate details returned from the API
+class AffiliateDetails {
+  final String affiliateName;
+  final String affiliateShortCode;
+  final String deeplinkUrl;
+
+  AffiliateDetails({
+    required this.affiliateName,
+    required this.affiliateShortCode,
+    required this.deeplinkUrl,
+  });
+}
+
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
   bool _verboseLogging = false;
@@ -88,22 +101,109 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     return RegExp(r'^[a-zA-Z0-9]{3,25}$').hasMatch(link);
   }
 
-  Future<void> setShortCode(String shortCode) async {
+  /// Validates and sets a short code for affiliate tracking
+  /// Returns true if the short code exists and was successfully validated and stored, false otherwise
+  Future<bool> setShortCode(String shortCode) async {
     if (shortCode.isEmpty) {
       errorLog("Short code cannot be empty", "warn");
-      return;
+      return false;
     }
 
     shortCode = shortCode.toUpperCase();
 
     if (shortCode.length < 3 || shortCode.length > 25 || !RegExp(r'^[a-zA-Z0-9]{3,25}$').hasMatch(shortCode)) {
       errorLog("Short code must be between 3-25 characters and contain only letters and numbers", "warn");
-      return;
+      return false;
     }
 
+    // Validate that the short code exists in the system
+    final affiliateDetails = await getAffiliateDetails(shortCode);
+    if (affiliateDetails == null) {
+      print('[Insert Affiliate] Error: Short code \'$shortCode\' does not exist or validation failed.');
+      return false;
+    }
+
+    print('[Insert Affiliate] Short code validated successfully for affiliate: ${affiliateDetails.affiliateName}');
+
+    // If validation passes, set the Insert Affiliate Identifier
     await _storeInsertAffiliateReferringLink(shortCode);
 
     notifyListeners();
+    return true;
+  }
+
+  /// Retrieves detailed information about an affiliate by their short code or deep link
+  /// This method queries the API and does not store or set the affiliate identifier
+  /// Returns AffiliateDetails if found, null otherwise
+  Future<AffiliateDetails?> getAffiliateDetails(String affiliateCode) async {
+    if (companyCode.isEmpty) {
+      print('[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.');
+      return null;
+    }
+
+    // Strip UUID from code if present (e.g., "ABC123-uuid" becomes "ABC123")
+    final cleanCode = affiliateCode.split('-').first;
+
+    const urlString = 'https://api.insertaffiliate.com/V1/checkAffiliateExists';
+
+    try {
+      final payload = {
+        'companyId': companyCode,
+        'affiliateCode': cleanCode,
+      };
+
+      verboseLog('Checking if affiliate exists: $cleanCode');
+
+      final response = await http.post(
+        Uri.parse(urlString),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+
+      verboseLog('API response status: ${response.statusCode}');
+
+      if (response.statusCode != 200) {
+        if (response.body.isNotEmpty) {
+          verboseLog('API Error (${response.statusCode}): ${response.body}');
+        }
+        return null;
+      }
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final exists = json['exists'] as bool?;
+
+      if (exists != true) {
+        verboseLog('Affiliate does not exist');
+        return null;
+      }
+
+      final affiliate = json['affiliate'] as Map<String, dynamic>?;
+      if (affiliate == null) {
+        verboseLog('Failed to parse affiliate details from response');
+        return null;
+      }
+
+      final affiliateName = affiliate['affiliateName'] as String?;
+      final affiliateShortCode = affiliate['affiliateShortCode'] as String?;
+      final deeplinkUrl = affiliate['deeplinkurl'] as String?;
+
+      if (affiliateName == null || affiliateShortCode == null || deeplinkUrl == null) {
+        verboseLog('Missing required fields in affiliate response');
+        return null;
+      }
+
+      verboseLog('Successfully retrieved affiliate details for: $affiliateName');
+
+      return AffiliateDetails(
+        affiliateName: affiliateName,
+        affiliateShortCode: affiliateShortCode,
+        deeplinkUrl: deeplinkUrl,
+      );
+    } catch (error) {
+      errorLog('Error fetching affiliate details: $error', 'error');
+      verboseLog('Error fetching affiliate details: $error');
+      return null;
+    }
   }
 
   // MARK: Device UUID

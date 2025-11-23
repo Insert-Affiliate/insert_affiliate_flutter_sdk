@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 import 'dart:math';
 import 'dart:io'; // For platform detection
-import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_play_install_referrer/android_play_install_referrer.dart';

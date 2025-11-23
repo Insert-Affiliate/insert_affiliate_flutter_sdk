@@ -1,3 +1,13 @@
+## 1.3.0
+Major feature release: Affiliate Details & Short Code Validation
+- NEW: `getAffiliateDetails()` method to retrieve affiliate information without setting identifier
+- NEW: `AffiliateDetails` class containing affiliateName, affiliateShortCode, and deeplinkUrl
+- Enhanced: `setShortCode()` now returns `Future<bool>` for validation feedback (breaking change)
+- Enhanced: `setShortCode()` validates short codes against the API before storing
+- Enhanced: Comprehensive README documentation with Flutter widget examples
+- Enhanced: Added detailed usage examples for getting affiliate details
+- Enhanced: Improved error handling and user feedback for short code validation
+
 ## 1.2.1
 Documentation update:
 - Fixed: README.md attribution timeout documentation now correctly shows initialization method as recommended approach

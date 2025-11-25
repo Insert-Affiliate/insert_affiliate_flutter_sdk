@@ -1,28 +1,38 @@
 # Insert Affiliate Flutter SDK
 
-## Overview
+![Version](https://img.shields.io/badge/version-1.0.0-brightgreen) ![Flutter](https://img.shields.io/badge/Flutter-3.0%2B-blue) ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey)
 
-The **Insert Affiliate Flutter SDK** is designed for Flutter applications, providing seamless integration with the [Insert Affiliate platform](https://insertaffiliate.com). The Insert Affiliate Flutter SDK simplifies affiliate marketing for iOS apps with in-app-purchases, allowing developers to create a seamless user experience for affiliate tracking and monetisation.
+The official Flutter SDK for [Insert Affiliate](https://insertaffiliate.com) - track affiliate-driven in-app purchases and reward your partners automatically.
 
-### Features
+**What does this SDK do?** It connects your Flutter app to Insert Affiliate's platform, enabling you to track which affiliates drive subscriptions and automatically pay them commissions when users make in-app purchases.
 
-- **Unique Device ID**: Creates a unique ID to anonymously associate purchases with users for tracking purposes.
-- **Affiliate Identifier Management**: Set and retrieve the affiliate identifier based on user-specific links.
-- **In-App Purchase (IAP) Initialisation**: Easily reinitialise in-app purchases with the option to validate using an affiliate identifier.
+## Table of Contents
 
-## Getting Started
-To get started with the Insert Affiliate Flutter SDK:
+- [Quick Start (5 Minutes)](#-quick-start-5-minutes)
+- [Essential Setup](#%EF%B8%8F-essential-setup)
+  - [1. Initialize the SDK](#1-initialize-the-sdk)
+  - [2. Configure In-App Purchase Verification](#2-configure-in-app-purchase-verification)
+  - [3. Set Up Deep Linking](#3-set-up-deep-linking)
+- [Verify Your Integration](#-verify-your-integration)
+- [Advanced Features](#-advanced-features)
+- [Troubleshooting](#-troubleshooting)
+- [Support](#-support)
 
-1. [Install the SDK via pubspec.yaml](#installation)
-2. [Initialise the SDK in your Main Dart File](#basic-usage)
-3. [Set up in-app purchases (Required)](#in-app-purchase-setup-required)
-4. [Set up deep linking (Required)](#deep-link-setup-required)
-5. [Use additional features like event tracking based on your app's requirements.](#additional-features)
+---
 
+## 🚀 Quick Start (5 Minutes)
 
-## Installation
+Get up and running with minimal code to validate the SDK works before tackling IAP and deep linking setup.
 
-Include the following dependencies in your pubspec.yaml file:
+### Prerequisites
+
+- **Flutter 3.0+**
+- **iOS 13.0+** / **Android API 21+**
+- **Company Code** from your [Insert Affiliate dashboard](https://app.insertaffiliate.com/settings)
+
+### Installation
+
+Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -33,380 +43,15 @@ dependencies:
   http: <latest_version>
 ```
 
-Run ```$ flutter pub get``` in your terminal from the project root to fetch the required packages.
-
-
-## Basic Usage
-### Import the SDKs
-
-Import the SDK in your Main Dart file:
-
-```dart
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+Then run:
+```bash
+flutter pub get
 ```
 
-### Initialisation in Main.dart
-To ensure proper initialisation of the **Insert Affiliate Flutter SDK**, you should initialise the InsertAffiliateFlutterSDK early in your app's lifecycle, typically within `Main.dart`.
-
-
-```dart
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-void main() async {
-    // Ensure Flutter is initialized before running any async code
-    WidgetsFlutterBinding.ensureInitialized();
-
-    // Important: Your Deep Linking Platform (i.e. Branch.io) and receipt verification platform if using a third party like RevenueCat / Iaptic, must be initialised before the Insert Affiliate SDK.
-
-    // Initialise Insert Affiliate SDK
-    insertAffiliateSdk = InsertAffiliateFlutterSDK(
-        companyCode: "{{ your_company_code }}",
-    ); 
-
-    runApp(MyApp());
-}
-```
-- Replace `{{ your_company_code }}` with the unique company code associated with your Insert Affiliate account. You can find this code in your dashboard under [Settings](http://app.insertaffiliate.com/settings).
-
-### Verbose Logging (Optional)
-
-For debugging and troubleshooting, you can enable verbose logging to get detailed insights into the SDK's operations:
-
-```dart
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-void main() async {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    // Initialise Insert Affiliate SDK with verbose logging enabled
-    insertAffiliateSdk = InsertAffiliateFlutterSDK(
-        companyCode: "{{ your_company_code }}",
-        verboseLogging: true,  // Enable detailed debugging logs
-    ); 
-
-    runApp(MyApp());
-}
-```
-
-**When verbose logging is enabled, you'll see detailed logs with the `[Insert Affiliate] [VERBOSE]` prefix that show debugging logs**
-This can be used to quickly identify configuration or setup issues
-
-⚠️ **Important**: Disable verbose logging in production builds to avoid exposing sensitive debugging information and to optimize performance.
-
-### Insert Link and Clipboard Control (BETA)
-We are currently beta testing our in-house deep linking provider, Insert Links, which generates links for use with your affiliates.
-
-For larger projects where accuracy is critical, we recommend using established third-party deep linking platforms to generate the links you use within Insert Affiliate - such as Appsflyer or Branch.io, as described in the rest of this README.
-
-If you encounter any issues while using Insert Links, please raise an issue on this GitHub repository or contact us directly at michael@insertaffiliate.com
-
-
-#### Insert Link Initialization
-
-```dart
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-void main() async {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    // Initialise Insert Affiliate SDK with deep link support
-    insertAffiliateSdk = InsertAffiliateFlutterSDK(
-        companyCode: "{{ your_company_code }}",
-        verboseLogging: true,  // Enable detailed debugging logs
-        insertLinksEnabled: true,  // Enable deep link processing
-        insertLinksClipboardEnabled: true, // Enable clipboard access for improved attribution (triggers permission prompt)
-        attributionTimeout: 2592000, // Set attribution timeout to 30 days in seconds (0 = disabled, default)
-    ); 
-
-    runApp(MyApp());
-}
-```
-
-**When to use `insertLinksEnabled`:**
-- Set to `true` (default: `false`) if you are using Insert Affiliate's built-in deep link and universal link handling (Insert Links)
-- Set to `false` if you are using an external provider for deep links
-
-**When to use `insertLinksClipboardEnabled`:**
-- Set to `true` (default: `false`) if you are using Insert Affiliate's built-in deep links (Insert Links) **and** would like to improve the effectiveness of our deep links through the clipboard
-- **Important caveat**: This will trigger a system prompt asking the user for permission to access the clipboard when the SDK initializes
-
-
-## In-App Purchase Setup [Required]
-Insert Affiliate requires a Receipt Verification platform to validate in-app purchases. You must choose **one** of our supported partners:
-- [RevenueCat](https://www.revenuecat.com/)
-- [Iaptic](https://www.iaptic.com/account)
-- [App Store Direct Integration](#option-3-app-store-direct-integration)
-- [Google Play Store Direct Integration](#option-4-google-play-store-direct-integration)
-
-### Option 1: RevenueCat Integration
-
-#### Code Setup
-1. **Install RevenueCat SDK** - First, follow the [RevenueCat SDK installation](https://www.revenuecat.com/docs/getting-started/installation/flutter) to set up in-app purchases and subscriptions.
-
-2. **Modify Initialisation Code** - Update the file where you initialise your deep linking (e.g., Branch.io) and RevenueCat to include a call to ```insertAffiliateSdk.returnInsertAffiliateIdentifier()```. This ensures that the Insert Affiliate identifier is passed to RevenueCat every time the app starts or a deep link is clicked.
-
-3. **Implementation Example**
-
-```dart
-import 'dart:async';
-import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-class _MyAppState extends State<MyApp> {
-    @override
-    void initState() {
-        super.initState();
-        _initializeAsyncDependencies();
-    }
-    
-    
-    Future<void> _initializeAsyncDependencies() async {
-        // Step 1: Initialize RevenueCat
-        await _initializeRevenueCat();
-        
-        // Step 2: Handle initial affiliate identifier
-        handleAffiliateIdentifier();
-        
-        // Step 3: Listen for deep links (Branch.io example)
-        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
-            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
-                final referringLink = data["~referring_link"];
-                insertAffiliateSdk.setInsertAffiliateIdentifier(referringLink);
-                
-                // Handle affiliate identifier after deep link click
-                handleAffiliateIdentifier();
-            }
-        }, onError: (error) {
-            print('listSession error: ${error.toString()}');
-        });
-    }
-    
-    void handleAffiliateIdentifier() {
-        insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
-            if (value != null && value.isNotEmpty) {
-                Purchases.setAttributes({"insert_affiliate" : value});
-            }
-        });
-    }
-}
-
-```
-
-#### Webhook Setup
-
-Next, you must setup a webhook to allow us to communicate directly with RevenueCat to track affiliate purchases.
-
-1. Go to RevenueCat and [create a new webhook](https://www.revenuecat.com/docs/integrations/webhooks)
-
-2. Configure the webhook with these settings:
-   - Webhook URL: `https://api.insertaffiliate.com/v1/api/revenuecat-webhook`
-   - Authorization header: Use the value from your Insert Affiliate dashboard (you'll get this in step 4)
-   - Set "Event Type" to "All events"
-
-3. In your [Insert Affiliate dashboard settings](https://app.insertaffiliate.com/settings):
-   - Navigate to the verification settings
-   - Set the in-app purchase verification method to `RevenueCat`
-
-4. Back in your Insert Affiliate dashboard:
-   - Locate the `RevenueCat Webhook Authentication Header` value
-   - Copy this value
-   - Paste it as the Authorization header value in your RevenueCat webhook configuration
-
-### Option 2: Iaptic Integration
-#### 1. Code Setup
-First, complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup. Then modify your ```main.dart``` file:
-
-
-```dart
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-class _MyAppState extends State<MyApp> {
-    final InAppPurchase _iap = InAppPurchase.instance;
-  
-    @override
-    void initState() {
-        super.initState();
-        _purchaseStream.listen((List<PurchaseDetails> purchaseDetailsList) {
-          _listenToPurchaseUpdated(purchaseDetailsList);
-        });
-    }
-    
-    void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
-        for (var purchaseDetails in purchaseDetailsList) {
-            if (purchaseDetails.status == PurchaseStatus.purchased) {
-                final jsonIapPurchase = {
-                    'transactionReceipt': purchaseDetails.verificationData.localVerificationData,
-                    'orderId': purchaseDetails.purchaseID,
-                    'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
-                    'signature': purchaseDetails.verificationData.localVerificationData,
-                    'applicationUsername': await insertAffiliateSdk.returnInsertAffiliateIdentifier(),
-                };
-                
-                final isValid = await insertAffiliateSdk.validatePurchaseWithIapticAPI(
-                    jsonIapPurchase,
-                    "{{ your_iaptic_app_id }}",
-                    "{{ your_iaptic_app_name }}",
-                    "{{ your_iaptic_public_key }}"
-                );
-            
-                // Optional: Handle the result of `isValid` if needed
-            }
-        }
-    }
-}
-```
-
-Replace the following:
-- `{{ your_iaptic_app_id }}` with your [Iaptic App ID](https://www.iaptic.com/account)
-- `{{ your_iaptic_app_name }}` with your [Iaptic App Name](https://www.iaptic.com/account)
-- `{{ your_iaptic_public_key }}` with your [Iaptic Public Key](https://www.iaptic.com/settings)
-
-#### 2. Webhook Setup
-
-1. Open the [Insert Affiliate settings](https://app.insertaffiliate.com/settings):
-  - Navigate to the Verification Settings section
-  - Set the In-App Purchase Verification method to `Iaptic`
-  - Copy the `Iaptic Webhook URL` and the `Iaptic Webhook Sandbox URL`- you'll need it in the next step.
-2. Go to the [Iaptic Settings](https://www.iaptic.com/settings)
-- Paste the copied `Iaptic Webhook URL` into the `Webhook URL` field
-- Paste the copied `Iaptic Webhook Sandbox URL` into the `Sandbox Webhook URL` field
-- Click **Save Settings**.
-3. Check that you have completed the [Iaptic setup for the App Store Server Notifications](https://www.iaptic.com/documentation/setup/ios-subscription-status-url)
-4. Check that you have completed the [Iaptic setup for the Google Play Notifications URL](https://www.iaptic.com/documentation/setup/connect-with-google-publisher-api)
-
-### Option 3: App Store Direct Integration
-
-Our direct App Store integration is currently in beta and currently supports subscriptions only. **Consumables and one-off purchases are not yet supported** due to App Store server-to-server notification limitations.
-
-We plan to release support for consumables and one-off purchases soon. In the meantime, you can use a receipt verification platform from the other integration options.
-
-#### Apple App Store Notification Setup
-To proceed, visit [our docs](https://docs.insertaffiliate.com/direct-store-purchase-integration#1-apple-app-store-server-notifications) and complete the required setup steps to set up App Store Server to Server Notifications.
-
-#### Implementing Purchases
-
-##### 1. Import Required Modules  
-
-Ensure you import the necessary dependencies, including `Platform` and `useDeepLinkIapProvider` from the SDK.  
-
-```dart
-import 'dart:io';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-```
-
-##### 2. Handle the Purchase
-When a user taps your purchase button, retrieve the appAccountToken using the Insert Affiliate SDK (iOS only), then pass it to the PurchaseParam when initiating the subscription. This links the purchase to the user account for affiliate tracking.
-
-```dart
-void _buySubscription(ProductDetails product) async {
-    String? appAccountToken;
-    if (Platform.isIOS) {
-        appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction();
-    }
-    
-    final purchaseParam = PurchaseParam(
-        productDetails: product,
-        applicationUserName: appAccountToken, // Will be null on Android and if null if no Insert Affiliate identifier is set from the user entering a short code or clicking an affiliate's link
-    );
-
-    _iap.buyNonConsumable(purchaseParam: purchaseParam);
-}
-```
-
-### Option 4: Google Play Store Direct Integration
-We now support direct Google Play Store integration (currently in beta). This enables real-time purchase tracking via Google Play’s Real-Time Developer Notifications (RTDN).
-
-
-#### Real Time Developer Notifications (RTDN) Setup
-
-Visit [our docs](https://docs.insertaffiliate.com/direct-google-play-store-purchase-integration) and complete the required set up steps for Google Play's Real Time Developer Notifications.
-
-#### Implementing Purchases
-
-##### 1. Import Required Modules  
-
-
-```dart
-import 'dart:io';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-```
-
-##### 2. Handle the Purchase
-Inside your purchase stream listener, ensure you track Android purchases by storing the purchaseToken:
-
-```dart
-void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
-    for (var purchaseDetails in purchaseDetailsList) {
-        if (_processedPurchases.contains(purchaseDetails.purchaseID)) return;
-
-        if (purchaseDetails.status == PurchaseStatus.purchased) {
-            if (Platform.isAndroid && purchaseDetails is GooglePlayPurchaseDetails) {
-                final purchaseToken = purchaseDetails.billingClientPurchase.purchaseToken;
-
-                if (purchaseToken.isNotEmpty) {
-                    await insertAffiliateSdk.storeExpectedStoreTransaction(purchaseToken);
-                }
-            }
-            _processedPurchases.add(purchaseDetails.purchaseID ?? "");
-            InAppPurchase.instance.completePurchase(purchaseDetails);
-        }
-    }
-}  
-```
-
-
-## Deep Link Setup [Required]
-Insert Affiliate requires a Deep Linking platform to create links for your affiliates. Our platform works with **any** deep linking provider, and you only need to follow these steps:
-1. **Create a deep link** in your chosen third-party platform and pass it to our dashboard when an affiliate signs up. 
-2. **Handle deep link clicks** in your app by passing the clicked link:
-  ```flutter
-  insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
-  ```
-
-### Deep Linking with Insert Links
-Insert Links by Insert Affiliate supports deferred deep linking into your app. This allows you to track affiliate attribution when end users are referred to your app by clicking on one of your affiliates Insert Links.
-
-#### Initial Setup
-1. Before you can use Insert Links, you must complete the setup steps in [our docs](https://docs.insertaffiliate.com/insert-links)
-
-2. **Initialization** of the Insert Affiliate SDK with Insert Links
-You must enable *insertLinksEnabled* when [initialising our SDK](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk?tab=readme-ov-file#insert-link-initialization)
-
-3. **Handle Insert Links** in your Flutter App
-The SDK provides a single `handleInsertLinks` method that automatically detects and handles different URL types. 
-
-#### Flutter App Integration
-
-For Flutter apps, you can handle Insert Links using the `app_links` package, which properly handles deep links when the app returns from background. This is the recommended approach for reliable deep link handling.
-
-##### Example Using app_links (Recommended for Deep Link Handling)
-
-**1. Add app_links dependency to pubspec.yaml:**
-
-```yaml
-dependencies:
-  app_links: ^6.3.2  # Add this line
-```
-
-**2. Import app_links in your main.dart:**
+### Your First Integration
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:app_links/app_links.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
 late final InsertAffiliateFlutterSDK insertAffiliateSdk;
@@ -414,10 +59,284 @@ late final InsertAffiliateFlutterSDK insertAffiliateSdk;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize SDK
+  // Initialize Insert Affiliate SDK
   insertAffiliateSdk = InsertAffiliateFlutterSDK(
-    companyCode: "your_company_code",
-    verboseLogging: true,
+    companyCode: "YOUR_COMPANY_CODE",  // Get from https://app.insertaffiliate.com/settings
+    verboseLogging: true,               // Enable for setup debugging
+  );
+
+  runApp(MyApp());
+}
+```
+
+**Expected Console Output:**
+
+```
+[Insert Affiliate] SDK initialized with company code: YOUR_COMPANY_CODE
+[Insert Affiliate] [VERBOSE] SDK marked as initialized
+```
+
+✅ **If you see these logs, the SDK is working!** Now proceed to Essential Setup.
+
+⚠️ **Disable verbose logging in production** by removing the `verboseLogging: true` parameter.
+
+---
+
+## ⚙️ Essential Setup
+
+Complete these three required steps to start tracking affiliate-driven purchases.
+
+### 1. Initialize the SDK
+
+You've already done basic initialization above. Here are additional options:
+
+<details>
+<summary><strong>Advanced Initialization Options</strong> (click to expand)</summary>
+
+```dart
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "YOUR_COMPANY_CODE",
+  verboseLogging: true,              // Enable detailed debugging logs
+  insertLinksEnabled: true,          // Enable Insert Links (built-in deep linking)
+  insertLinksClipboardEnabled: true, // Enable clipboard attribution (triggers permission prompt)
+  attributionTimeout: 604800,        // 7 days attribution timeout in seconds
+);
+```
+
+**Parameters:**
+- `verboseLogging`: Shows detailed logs for debugging (disable in production)
+- `insertLinksEnabled`: Set to `true` if using Insert Links, `false` if using Branch/AppsFlyer
+- `insertLinksClipboardEnabled`: Enables clipboard-based attribution for Insert Links
+- `attributionTimeout`: How long affiliate attribution lasts in seconds (0 = never expires)
+
+</details>
+
+---
+
+### 2. Configure In-App Purchase Verification
+
+**Insert Affiliate requires a receipt verification method to validate purchases.** Choose **ONE** of the following:
+
+| Method | Best For | Setup Time | Complexity |
+|--------|----------|------------|------------|
+| [**RevenueCat**](#option-1-revenuecat-recommended) | Most developers, managed infrastructure | ~10 min | Simple |
+| [**Iaptic**](#option-2-iaptic) | Custom requirements, direct control | ~15 min | Medium |
+| [**App Store Direct**](#option-3-app-store-direct) | No 3rd party fees (iOS) | ~20 min | Medium |
+| [**Google Play Direct**](#option-4-google-play-direct) | No 3rd party fees (Android) | ~20 min | Medium |
+
+<details open>
+<summary><h4>Option 1: RevenueCat (Recommended)</h4></summary>
+
+**Step 1: Code Setup**
+
+Complete the [RevenueCat Flutter SDK installation](https://www.revenuecat.com/docs/getting-started/installation/flutter) first, then:
+
+```dart
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeAsyncDependencies();
+  }
+
+  Future<void> _initializeAsyncDependencies() async {
+    // Initialize RevenueCat
+    await Purchases.configure(PurchasesConfiguration("YOUR_REVENUECAT_API_KEY"));
+
+    // Handle affiliate identifier
+    handleAffiliateIdentifier();
+  }
+
+  void handleAffiliateIdentifier() {
+    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+      if (value != null && value.isNotEmpty) {
+        Purchases.setAttributes({"insert_affiliate": value});
+      }
+    });
+  }
+}
+```
+
+**Step 2: Webhook Setup**
+
+1. In RevenueCat, [create a new webhook](https://www.revenuecat.com/docs/integrations/webhooks)
+2. Configure webhook settings:
+   - **Webhook URL**: `https://api.insertaffiliate.com/v1/api/revenuecat-webhook`
+   - **Event Type**: "All events"
+3. In your [Insert Affiliate dashboard](https://app.insertaffiliate.com/settings):
+   - Set **In-App Purchase Verification** to `RevenueCat`
+   - Copy the `RevenueCat Webhook Authentication Header` value
+4. Paste the authentication header into RevenueCat's **Authorization header** field
+
+✅ **RevenueCat setup complete!**
+
+</details>
+
+<details>
+<summary><h4>Option 2: Iaptic</h4></summary>
+
+**Step 1: Code Setup**
+
+Complete the [In App Purchase Flutter Library](https://pub.dev/packages/in_app_purchase) setup first:
+
+```dart
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+class _MyAppState extends State<MyApp> {
+  final InAppPurchase _iap = InAppPurchase.instance;
+
+  void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
+    for (var purchaseDetails in purchaseDetailsList) {
+      if (purchaseDetails.status == PurchaseStatus.purchased) {
+        final jsonIapPurchase = {
+          'transactionReceipt': purchaseDetails.verificationData.localVerificationData,
+          'orderId': purchaseDetails.purchaseID,
+          'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
+          'signature': purchaseDetails.verificationData.localVerificationData,
+          'applicationUsername': await insertAffiliateSdk.returnInsertAffiliateIdentifier(),
+        };
+
+        await insertAffiliateSdk.validatePurchaseWithIapticAPI(
+          jsonIapPurchase,
+          "YOUR_IAPTIC_APP_ID",
+          "YOUR_IAPTIC_APP_NAME",
+          "YOUR_IAPTIC_PUBLIC_KEY"
+        );
+      }
+    }
+  }
+}
+```
+
+**Step 2: Webhook Setup**
+
+1. In [Insert Affiliate settings](https://app.insertaffiliate.com/settings):
+   - Set verification method to `Iaptic`
+   - Copy the `Iaptic Webhook URL` and `Iaptic Webhook Sandbox URL`
+2. In [Iaptic Settings](https://www.iaptic.com/settings):
+   - Paste the Webhook URLs into corresponding fields
+   - Click **Save Settings**
+3. Complete [Iaptic App Store Server Notifications setup](https://www.iaptic.com/documentation/setup/ios-subscription-status-url)
+4. Complete [Iaptic Google Play Notifications setup](https://www.iaptic.com/documentation/setup/connect-with-google-publisher-api)
+
+✅ **Iaptic setup complete!**
+
+</details>
+
+<details>
+<summary><h4>Option 3: App Store Direct</h4></summary>
+
+**Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-store-purchase-integration#1-apple-app-store-server-notifications) and complete the App Store Server Notifications setup.
+
+**Step 2: Implementing Purchases**
+
+```dart
+import 'dart:io';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+void _buySubscription(ProductDetails product) async {
+  String? appAccountToken;
+  if (Platform.isIOS) {
+    appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction();
+  }
+
+  final purchaseParam = PurchaseParam(
+    productDetails: product,
+    applicationUserName: appAccountToken,
+  );
+
+  _iap.buyNonConsumable(purchaseParam: purchaseParam);
+}
+```
+
+✅ **App Store Direct setup complete!**
+
+</details>
+
+<details>
+<summary><h4>Option 4: Google Play Direct</h4></summary>
+
+**Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-google-play-store-purchase-integration) and complete the RTDN setup.
+
+**Step 2: Implementing Purchases**
+
+```dart
+import 'dart:io';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
+  for (var purchaseDetails in purchaseDetailsList) {
+    if (purchaseDetails.status == PurchaseStatus.purchased) {
+      if (Platform.isAndroid && purchaseDetails is GooglePlayPurchaseDetails) {
+        final purchaseToken = purchaseDetails.billingClientPurchase.purchaseToken;
+        if (purchaseToken.isNotEmpty) {
+          await insertAffiliateSdk.storeExpectedStoreTransaction(purchaseToken);
+        }
+      }
+      InAppPurchase.instance.completePurchase(purchaseDetails);
+    }
+  }
+}
+```
+
+✅ **Google Play Direct setup complete!**
+
+</details>
+
+---
+
+### 3. Set Up Deep Linking
+
+**Deep linking lets affiliates share unique links that track users to your app.** Choose **ONE** deep linking provider:
+
+| Provider | Best For | Complexity | Setup Guide |
+|----------|----------|------------|-------------|
+| [**Insert Links**](#option-1-insert-links) | Simple setup, no 3rd party | Simple | [View](#option-1-insert-links) |
+| [**Branch.io**](#option-2-branchio) | Robust attribution, deferred deep linking | Medium | [View](#option-2-branchio) |
+| [**AppsFlyer**](#option-3-appsflyer) | Enterprise analytics, comprehensive attribution | Medium | [View](#option-3-appsflyer) |
+
+<details open>
+<summary><h4>Option 1: Insert Links</h4></summary>
+
+Insert Links is Insert Affiliate's built-in deep linking solution.
+
+**Step 1:** Complete the [Insert Links setup](https://docs.insertaffiliate.com/insert-links) in the dashboard.
+
+**Step 2: Initialize with Insert Links enabled**
+
+```dart
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "YOUR_COMPANY_CODE",
+  verboseLogging: true,
+  insertLinksEnabled: true,
+  insertLinksClipboardEnabled: true,
+);
+```
+
+**Step 3: Set up deep link handling with app_links**
+
+Add to `pubspec.yaml`:
+```yaml
+dependencies:
+  app_links: ^6.3.2
+```
+
+```dart
+import 'package:app_links/app_links.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "YOUR_COMPANY_CODE",
     insertLinksEnabled: true,
     insertLinksClipboardEnabled: true,
   );
@@ -425,1040 +344,353 @@ void main() async {
   // Set up callback for affiliate identifier changes
   insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
     if (identifier != null) {
-      // *** Required if using RevenueCat *** //
+      // For RevenueCat:
       // Purchases.setAttributes({"insert_affiliate": identifier});
-      // *** End of RevenueCat section *** //
 
-      // *** Required if using Apphud *** //
+      // For Apphud:
       // Apphud.setUserProperty(key: "insert_affiliate", value: identifier, setOnce: false);
-      // *** End of Apphud Section *** //
-
-      // *** Required only if you're using Iaptic ** //
-      // InAppPurchase.initialize(
-      //   iapProducts: iapProductsArray,
-      //   validatorUrlString: "https://validator.iaptic.com/v3/validate?appName={{ your_iaptic_app_name }}&apiKey={{ your_iaptic_app_key_goes_here }}",
-      //   applicationUsername: identifier
-      // );
-      // *** End of Iaptic Section ** //
     }
   });
 
-  // CRITICAL: Set up deep link listener for background returns
+  // Set up deep link listener
   _setupDeepLinkListener();
 
   runApp(MyApp());
 }
 
-void _setupDeepLinkListener() {
+void _setupDeepLinkListener() async {
   final appLinks = AppLinks();
 
-  // Check for initial link (fresh install/launch)
-  try {
-    final initialLink = await appLinks.getInitialLink();
-    if (initialLink != null) {
-      print('Initial deep link received: $initialLink');
-      await insertAffiliateSdk.handleDeepLink(initialLink.toString());
-    }
-  } catch (e) {
-    print('Failed to get initial link: $e');
+  // Check for initial link
+  final initialLink = await appLinks.getInitialLink();
+  if (initialLink != null) {
+    await insertAffiliateSdk.handleDeepLink(initialLink.toString());
   }
 
-  // Listen for incoming links when app returns from background
-  appLinks.uriLinkStream.listen((Uri uri) {
-    print('Deep link received: $uri');
+  // Listen for incoming links
+  appLinks.uriLinkStream.listen((Uri uri) async {
     await insertAffiliateSdk.handleDeepLink(uri.toString());
   });
 }
-
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Insert Affiliate App',
-      home: HomePage(),
-    );
-  }
-}
-
 ```
 
-**Debugging Deep Links:** Enable [verbose logging](#verbose-logging-optional) during development to see visual confirmation when deep links are processed successfully. This shows detailed logs with the extracted user code, affiliate email, and company information.
+✅ **Insert Links setup complete!**
 
-#### Retrieving Affiliate Information
-After handling a deep link, you can retrieve the affiliate information:
+</details>
 
-```dart
-// Get the affiliate identifier
-final affiliateIdentifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
-if (affiliateIdentifier != null) {
-  print('Affiliate ID: $affiliateIdentifier');
-}
-```
+<details>
+<summary><h4>Option 2: Branch.io</h4></summary>
 
-
-### Deep Linking with Branch.io
-To set up deep linking with Branch.io, follow these steps:
-
-1. Create a deep link in Branch and pass it to our dashboard when an affiliate signs up.
-    - Example: [Create Affiliate](https://docs.insertaffiliate.com/create-affiliate).
-2. Modify Your Deep Link Handling in `Main.dart`
-    - After setting up your Branch integration, add the following code to initialise the Insert Affiliate SDK in your iOS app:
-
-#### Modify Your Deep Link listSession Listener function in `Main.dart`
-
+**Key Integration Steps:**
+1. Install and configure [Flutter Branch SDK](https://pub.dev/packages/flutter_branch_sdk)
+2. Listen for Branch deep link events with `FlutterBranchSdk.listSession()`
+3. Extract `~referring_link` from Branch callback
+4. Pass to Insert Affiliate SDK using `setInsertAffiliateIdentifier()`
 
 ```dart
 import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+_branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
+  if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
+    insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
 
-class _MyAppState extends State<MyApp> {
-    
-    late StreamSubscription<Map> _branchStreamSubscription;
-    
-    @override
-    void initState() {
-        super.initState();
-        
-        _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
-            if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
-                insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
-            }
-        }, onError: (error) {
-            print('Branch session error: ${error.toString()}');
-        });
-     }
-}
+    // For RevenueCat: Update attributes
+    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+      if (value != null) {
+        Purchases.setAttributes({"insert_affiliate": value});
+      }
+    });
+  }
+});
 ```
 
-### Using the SDK with AppsFlyer (Flutter)
+📖 **[View complete Branch.io integration guide →](docs/deep-linking-branch.md)**
 
-To set up deep linking with AppsFlyer, follow these steps:
+</details>
 
-1. Create a [OneLink](https://support.appsflyer.com/hc/en-us/articles/208874366-Create-a-OneLink-link-for-your-campaigns) in AppsFlyer and pass it to our dashboard when an affiliate signs up.
-   - Example: [Create Affiliate](https://docs.insertaffiliate.com/create-affiliate).
-2. Initialize AppsFlyer SDK and set up deep link handling in your app.
+<details>
+<summary><h4>Option 3: AppsFlyer</h4></summary>
 
-#### Prerequisites
-
-- AppsFlyer Dev Key from your AppsFlyer dashboard
-- iOS App ID and Android package name configured in AppsFlyer
-
-#### Install & Configure Dependencies
-
-1. **Add AppsFlyer SDK** to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  insert_affiliate_flutter_sdk: <latest_version>
-  appsflyer_sdk: ^6.14.4
-```
-
-2. **Configure manifest** for OneLink deep linking in `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<!-- Add these permissions at the top of the AndroidManifest.xml file -->
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-<uses-permission android:name="com.android.vending.INSTALL_REFERRER" />
-
-<activity android:name=".MainActivity" android:exported="true">
-    <!-- OneLink deep linking -->
-    <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="https" android:host="{{ONELINK_SUBDOMAIN}}.onelink.me" />
-    </intent-filter>
-</activity>
-<!-- Add AppsFlyer metadata -->
-<application>
-    <meta-data android:name="com.appsflyer.ApiKey" android:value="{{APPSFLYER_DEV_KEY}}" />
-</application>
-```
-
-3. **Configure iOS** in `ios/Runner/Info.plist`:
-
-```xml
-<key>CFBundleURLTypes</key>
-<array>
-    <dict>
-        <key>CFBundleURLSchemes</key>
-        <array><string>{{SCHEME}}</string></array>
-    </dict>
-</array>
-<key>com.apple.developer.associated-domains</key>
-<array>
-    <string>applinks:{{ONELINK_SUBDOMAIN}}.onelink.me</string>
-</array>
-<!-- Add this permission for clipboard access (required for insertLinksClipboardEnabled) -->
-<key>NSPasteboardGeneralUseDescription</key>
-<string>This app needs clipboard access to detect affiliate links</string>
-```
-
-#### Initialize AppsFlyer and the SDK
+**Key Integration Steps:**
+1. Install and configure [AppsFlyer Flutter SDK](https://pub.dev/packages/appsflyer_sdk)
+2. Listen for `onDeepLinking` and `onInstallConversionData` callbacks
+3. Pass deep link value to Insert Affiliate SDK using `setInsertAffiliateIdentifier()`
 
 ```dart
 import 'package:appsflyer_sdk/appsflyer_sdk.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
 
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-late AppsflyerSdk _appsflyerSdk;
+_appsflyerSdk.onDeepLinking((deepLinkResult) async {
+  if (deepLinkResult.status == Status.FOUND) {
+    final deepLinkValue = deepLinkResult.deepLink?.deepLinkValue;
+    if (deepLinkValue != null) {
+      await insertAffiliateSdk.setInsertAffiliateIdentifier(deepLinkValue);
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize AppsFlyer SDK
-  final AppsFlyerOptions appsFlyerOptions = AppsFlyerOptions(
-    afDevKey: "{{APPSFLYER_DEV_KEY}}",
-    appId: "{{AF_APP_ID}}", // iOS App ID
-    showDebug: true,
-  );
-
-  _appsflyerSdk = AppsflyerSdk(appsFlyerOptions);
-
-  // Initialize Insert Affiliate SDK
-  insertAffiliateSdk = InsertAffiliateFlutterSDK(
-    companyCode: "{{ your_company_code }}",
-  );
-
-  runApp(MyApp());
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    _initializeAppsFlyer();
-  }
-
-  Future<void> _initializeAppsFlyer() async {
-    await _appsflyerSdk.initSdk(
-      registerConversionDataCallback: true,
-      registerOnDeepLinkingCallback: true,
-    );
-
-    // Handle deep links
-    _appsflyerSdk.onDeepLinking((deepLinkResult) async {
-      if (deepLinkResult.status == Status.FOUND) {
-        final deepLinkValue = deepLinkResult.deepLink?.deepLinkValue;
-        if (deepLinkValue != null && deepLinkValue.isNotEmpty) {
-          await insertAffiliateSdk.setInsertAffiliateIdentifier(deepLinkValue);
-          
-          // For RevenueCat: Set attributes
-          final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
-          if (affiliateId != null) {
-            Purchases.setAttributes({"insert_affiliate": affiliateId});
-          }
-        }
+      // For RevenueCat: Update attributes
+      final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+      if (affiliateId != null) {
+        Purchases.setAttributes({"insert_affiliate": affiliateId});
       }
-    });
-
-    // Handle install conversion data
-    _appsflyerSdk.onInstallConversionData((installConversionData) async {
-      if (installConversionData?['af_status'] == 'Non-organic') {
-        final affiliateLink = installConversionData?['media_source'] ?? 
-                             installConversionData?['campaign'];
-        if (affiliateLink != null) {
-          await insertAffiliateSdk.setInsertAffiliateIdentifier(affiliateLink);
-        }
-      }
-    });
+    }
   }
-}
+});
 ```
 
-#### In-App Purchase Integration
+📖 **[View complete AppsFlyer integration guide →](docs/deep-linking-appsflyer.md)**
 
-For **iOS App Store Direct**: The SDK automatically handles app account tokens during purchase.
+</details>
 
-For **Google Play Direct**, add purchase token tracking:
+---
+
+## ✅ Verify Your Integration
+
+### Integration Checklist
+
+- [ ] **SDK Initializes**: Check console for `SDK initialized with company code` log
+- [ ] **Affiliate Identifier Stored**: Click a test affiliate link and verify identifier is stored
+- [ ] **Purchase Tracked**: Make a test purchase and verify it appears in Insert Affiliate dashboard
+
+### Testing Commands
+
+```bash
+# Test deep link (Android Emulator)
+adb shell am start -W -a android.intent.action.VIEW -d "https://your-deep-link-url/abc123"
+
+# Test deep link (iOS Simulator)
+xcrun simctl openurl booted "https://your-deep-link-url/abc123"
+```
+
+### Check Stored Affiliate Identifier
 
 ```dart
-// In your purchase stream listener
-if (Platform.isAndroid && purchaseDetails is GooglePlayPurchaseDetails) {
-  final purchaseToken = purchaseDetails.billingClientPurchase.purchaseToken;
-  await insertAffiliateSdk.storeExpectedStoreTransaction(purchaseToken);
-}
+final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+print('Current affiliate ID: $affiliateId');
 ```
 
-#### Verifying the Integration
+### Common Setup Issues
 
-**Test deep link:**
-```bash
-# Android
-adb shell am start -a android.intent.action.VIEW -d "https://{{ONELINK_SUBDOMAIN}}.onelink.me/{{LINK_ID}}/test"
+| Issue | Solution |
+|-------|----------|
+| "Company code is not set" | Ensure SDK is initialized before calling other methods |
+| "No affiliate identifier found" | User must click an affiliate link before making a purchase |
+| Deep link opens browser instead of app | Verify URL schemes in Info.plist (iOS) and AndroidManifest.xml (Android) |
+| Purchase not tracked | Check webhook configuration in IAP verification platform |
 
-# iOS (Simulator)
-xcrun simctl openurl booted "https://{{ONELINK_SUBDOMAIN}}.onelink.me/{{LINK_ID}}/test"
-```
+---
 
-**Check logs:**
-```bash
-flutter logs | grep -E "(AppsFlyer|Insert Affiliate)"
-```
+## 🔧 Advanced Features
 
-#### Troubleshooting
+<details>
+<summary><h3>Event Tracking (Beta)</h3></summary>
 
-- **App opens store instead of app**: Verify package name/bundle ID and certificate fingerprints in AppsFlyer OneLink settings
-- **No attribution data**: Ensure AppsFlyer SDK initialization occurs before setting up callbacks
-- **Deep links not working**: Check intent-filter/URL scheme configuration
-
-| Placeholder | Example/Note |
-|-------------|--------------|
-| `{{APPSFLYER_DEV_KEY}}` | Your AppsFlyer Dev Key |
-| `{{AF_APP_ID}}` | iOS App ID (numbers only) |
-| `{{ONELINK_SUBDOMAIN}}` | e.g., yourapp (from yourapp.onelink.me) |
-| `{{SCHEME}}` | Custom scheme if applicable (e.g., myapp) |
-```
-
-## Additional Features
-
-### 1. Event Tracking (Beta)
-
-The **InsertAffiliateFlutter SDK** now includes a beta feature for event tracking. Use event tracking to log key user actions such as signups, purchases, or referrals. This is useful for:
-- Understanding user behaviour.
-- Measuring the effectiveness of marketing campaigns.
-- Incentivising affiliates for designated actions being taken by the end users, rather than just in app purchases (i.e. pay an affilaite for each signup).
-
-At this stage, we cannot guarantee that this feature is fully resistant to tampering or manipulation.
-
-#### Using `trackEvent`
-
-To track an event, use the `trackEvent` function. Make sure to set an affiliate identifier first; otherwise, event tracking won’t work. Here’s an example:
+Track custom events beyond purchases to incentivize affiliates for specific actions.
 
 ```dart
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
 ElevatedButton(
   onPressed: () {
-    insertAffiliateSdk.trackEvent(eventName: "yourEventIdentifier")
+    insertAffiliateSdk.trackEvent(eventName: "user_signup")
       .then((_) => print('Event tracked successfully!'))
-      .catchError((error) => print('Error tracking event: $error'));
-  },d
-  child: Text("Track Test Event"),
+      .catchError((error) => print('Error: $error'));
+  },
+  child: Text("Track Signup"),
 );
 ```
 
-### 2. Short Codes (Beta)
+**Use Cases:**
+- Pay affiliates for signups instead of purchases
+- Track trial starts, content unlocks, or other conversions
 
-### What are Short Codes?
+</details>
 
-Short codes are unique, 3 to 25 character alphanumeric identifiers that affiliates can use to promote products or subscriptions. These codes are ideal for influencers or partners, making them easier to share than long URLs.
+<details>
+<summary><h3>Short Codes</h3></summary>
 
-**Example Use Case**: An influencer promotes a subscription with the short code "JOIN123456" within their TikTok video's description. When users enter this code within your app during sign-up or before purchase, the app tracks the subscription back to the influencer for commission payouts.
+Short codes are unique, 3-25 character alphanumeric identifiers that affiliates can share.
 
-For more information, visit the [Insert Affiliate Short Codes Documentation](https://docs.insertaffiliate.com/short-codes).
-
-```dart
-late final InsertAffiliateFlutterSDK insertAffiliateSdk;
-
-insertAffiliateSdk.setShortCode("B2SC6VRSKQ")
-```
-
-### Getting Affiliate Details
-
-You can retrieve detailed information about an affiliate by their short code or deep link using the `getAffiliateDetails` method. This is useful for displaying affiliate information to users or showing personalized content based on the referrer.
-
-#### Method Signature
+**Validate and Store Short Code:**
 
 ```dart
-Future<AffiliateDetails?> getAffiliateDetails(String affiliateCode)
+final isValid = await insertAffiliateSdk.setShortCode('SAVE20');
 
-class AffiliateDetails {
-  final String affiliateName;
-  final String affiliateShortCode;
-  final String deeplinkUrl;
-}
-```
-
-#### Usage Example
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-class MyWidget extends StatefulWidget {
-  @override
-  _MyWidgetState createState() => _MyWidgetState();
-}
-
-class _MyWidgetState extends State<MyWidget> {
-  String? affiliateName;
-
-  Future<void> handleGetAffiliateInfo(String code) async {
-    final details = await insertAffiliateSdk.getAffiliateDetails(code);
-
-    if (details != null) {
-      print('Affiliate Name: ${details.affiliateName}');
-      print('Short Code: ${details.affiliateShortCode}');
-      print('Deep Link: ${details.deeplinkUrl}');
-
-      // Update UI with affiliate name
-      setState(() {
-        affiliateName = details.affiliateName;
-      });
-    } else {
-      print('Affiliate not found');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (affiliateName != null)
-          Text('Referred by: $affiliateName'),
-
-        ElevatedButton(
-          onPressed: () => handleGetAffiliateInfo('JOIN123'),
-          child: Text('Get Affiliate Info'),
-        ),
-      ],
-    );
-  }
-}
-```
-
-#### Return Value
-
-Returns an `AffiliateDetails` object with affiliate information if the code exists:
-- `affiliateName`: The name of the affiliate
-- `affiliateShortCode`: The affiliate's short code
-- `deeplinkUrl`: The affiliate's deep link URL
-
-Returns `null` if:
-- The affiliate code doesn't exist
-- The company code is not initialized
-- There's a network error or API issue
-
-#### Important Notes
-
-- This method **does not store or set** the affiliate identifier - it only retrieves information
-- Use `setShortCode()` to actually associate an affiliate with a user
-- The method automatically strips UUIDs from codes (e.g., "ABC123-uuid" becomes "ABC123")
-- Works with both short codes and deep link URLs
-
-#### Getting the Stored Affiliate Identifier
-
-To retrieve the currently stored affiliate identifier (the one associated with the current user), use `returnInsertAffiliateIdentifier()`:
-
-```dart
-// Get the current affiliate identifier
-final affiliateIdentifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
-if (affiliateIdentifier != null) {
-  print('Current affiliate identifier: $affiliateIdentifier');
+if (isValid) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Success'),
+      content: Text('Affiliate code applied!'),
+    ),
+  );
 } else {
-  print('No affiliate identifier found');
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Error'),
+      content: Text('Invalid affiliate code'),
+    ),
+  );
 }
 ```
 
-**Important Notes:**
-- This method should only be called after SDK initialization is complete
-- Returns `null` if no affiliate identifier has been set
-- Respects the attribution timeout if configured (see [Attribution Timeout](#attribution-timeout))
-- The identifier is automatically stored when a user clicks an affiliate link or enters a short code
-
-### Setting a Short Code
-
-Use the `setShortCode` method to validate and associate a short code with an affiliate. This is ideal for scenarios where users enter the code via an input field, pop-up, or similar UI element.
-
-#### Method Signature
+**Get Affiliate Details Without Setting:**
 
 ```dart
-Future<bool> setShortCode(String shortCode)
-```
+final details = await insertAffiliateSdk.getAffiliateDetails('SAVE20');
 
-#### Return Value
-
-`setShortCode` returns a `bool`:
-- Returns **`true`** if the short code exists and was successfully validated and stored
-- Returns **`false`** if the short code does not exist or validation failed
-
-This allows you to provide immediate feedback to users about whether their entered code is valid.
-
-#### Short Code Requirements
-
-Short codes must meet the following criteria:
-- Between **3 and 25 characters long**
-- Contain only **letters and numbers** (alphanumeric characters)
-
-#### Basic Usage
-
-```dart
-// Basic usage (without validation feedback)
-final success = await insertAffiliateSdk.setShortCode('JOIN123');
-```
-
-#### Recommended Usage with Validation Feedback
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-class ShortCodeView extends StatefulWidget {
-  @override
-  _ShortCodeViewState createState() => _ShortCodeViewState();
-}
-
-class _ShortCodeViewState extends State<ShortCodeView> {
-  final TextEditingController _controller = TextEditingController();
-  String? alertTitle;
-  String? alertMessage;
-  bool showAlert = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text('Enter your Short Code', style: TextStyle(fontSize: 18)),
-        SizedBox(height: 10),
-
-        TextField(
-          controller: _controller,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Short Code',
-          ),
-          textCapitalization: TextCapitalization.characters,
-        ),
-        SizedBox(height: 10),
-
-        ElevatedButton(
-          onPressed: () async {
-            final isValid = await insertAffiliateSdk.setShortCode(_controller.text);
-
-            setState(() {
-              if (isValid) {
-                alertTitle = 'Success';
-                alertMessage = 'Affiliate code applied successfully!';
-              } else {
-                alertTitle = 'Error';
-                alertMessage = 'Invalid affiliate code. Please check and try again.';
-              }
-              showAlert = true;
-            });
-
-            // Show dialog
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(alertTitle!),
-                content: Text(alertMessage!),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('OK'),
-                  ),
-                ],
-              ),
-            );
-          },
-          child: Text('Set Short Code'),
-        ),
-      ],
-    );
-  }
+if (details != null) {
+  print('Affiliate Name: ${details.affiliateName}');
+  print('Short Code: ${details.affiliateShortCode}');
+  print('Deep Link: ${details.deeplinkUrl}');
 }
 ```
 
-#### Important Notes
+Learn more: [Short Codes Documentation](https://docs.insertaffiliate.com/short-codes)
 
-- The method validates the short code against the Insert Affiliate API before storing it
-- Validation checks both format (length, alphanumeric) and existence in your affiliate database
-- Short codes are automatically converted to uppercase
-- Use the return value to show success/error messages to your users
+</details>
 
-### 3. Discounts for Users → Offer Codes / Dynamic Product IDs
+<details>
+<summary><h3>Dynamic Offer Codes / Discounts</h3></summary>
 
-The SDK allows you to apply dynamic modifiers to in-app purchases based on whether the app was installed via an affiliate. These modifiers can be used to swap the default product ID for a discounted or trial-based one - similar to applying an offer code.
+Automatically apply discounts or trials when users come from specific affiliates.
 
-#### How It Works
+**How It Works:**
+1. Configure an offer code modifier in your dashboard (e.g., `_oneWeekFree`)
+2. SDK automatically fetches and stores the modifier when affiliate identifier is set
+3. Use the modifier to construct dynamic product IDs
 
-When a user clicks an affiliate link or enters a short code of an affiliate with a linked offer (set up in the **Insert Affiliate Dashboard**), the SDK auto-populates offer code data with a relevant modifier (e.g., `_oneWeekFree`). You can append this to your base product ID to dynamically display the correct subscription.
-
-#### Basic Usage
-
-##### 1. Automatic Offer Code Fetching
-If an affiliate short code is stored, the SDK automatically fetches and saves the associated offer code modifier when:
-- An affiliate identifier is set via `setInsertAffiliateIdentifier()`
-- A short code is set via `setShortCode()`
-
-##### 2. Access the Stored Offer Code
-The offer code modifier can be retrieved using:
+**Quick Example:**
 
 ```dart
 String? offerCode = await insertAffiliateSdk.getStoredOfferCode();
+
+final baseProductId = "oneMonthSubscription";
+final dynamicProductId = offerCode != null
+    ? '$baseProductId$offerCode'  // e.g., "oneMonthSubscription_oneWeekFree"
+    : baseProductId;
+
+// Use dynamicProductId when fetching/purchasing products
 ```
 
-#### Setup Requirements
+📖 **[View complete Dynamic Offer Codes guide →](docs/dynamic-offer-codes.md)**
 
-##### Insert Affiliate Dashboard Configuration
-1. Go to your Insert Affiliate dashboard at [app.insertaffiliate.com/affiliates](https://app.insertaffiliate.com/affiliates)
-2. Select the affiliate you want to configure
-3. Click "View" to access the affiliate's settings
-4. Assign an iOS IAP Modifier to the affiliate (e.g., `_oneWeekFree`, `_threeMonthsFree`)
-5. Assign an Android IAP Modifier to the affiliate (e.g., `-oneweekfree`, `-threemonthsfree`)
-6. Save the settings
+</details>
 
-Once configured, when users click that affiliate's links or enter their short codes, your app will automatically receive the modifier and can load the appropriate discounted product.
+<details>
+<summary><h3>Attribution Timeout Control</h3></summary>
 
-#### App Store Connect Configuration
-1. Create both a base and a promotional product:
-   - Base product: `oneMonthSubscription`
-   - Promo product: `oneMonthSubscription_oneWeekFree`
-2. Ensure **both** products are approved and available for sale.
+Control how long affiliate attribution remains active.
 
-#### Google Play Console Configuration
-There are multiple ways you can configure your products in Google Play Console:
-
-1. **Multiple Products Approach**: Create both a base and a promotional product:
-   - Base product: `oneMonthSubscription`
-   - Promo product: `oneMonthSubscription-oneweekfree`
-
-2. **Single Product with Multiple Base Plans**: Create one product with multiple base plans, one with an offer attached
-
-3. **Developer Triggered Offers**: Have one base product and apply the offer through developer-triggered offers
-
-4. **Base Product with Intro Offers**: Have one base product that includes an introductory offer
-
-Any of these approaches are suitable and work with the SDK. The important part is that your product naming follows the pattern where the offer code modifier can be appended to identify the promotional version.
-
-**If using the Multiple Products Approach:**
-- Ensure **both** products are activated and available for purchase.
-- Generate a release to at least **Internal Testing** to make the products available in your current app build
-
-**Product Naming Pattern:**
-- Follow the pattern: `{baseProductId}{OfferCode}`
-- Example: `oneMonthSubscription` + `_oneWeekFree` = `oneMonthSubscription_oneWeekFree`
-
----
-
-#### RevenueCat Integration Example
-
-For apps using RevenueCat, you can dynamically construct offering identifiers:
+**Set Timeout During Initialization:**
 
 ```dart
-import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-class PurchaseHandler extends StatefulWidget {
-  @override
-  _PurchaseHandlerState createState() => _PurchaseHandlerState();
-}
-
-class _PurchaseHandlerState extends State<PurchaseHandler> {
-  List<Package> availablePackages = [];
-  String? offerCode;
-  bool loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchSubscriptions();
-  }
-
-  Future<void> fetchSubscriptions() async {
-    setState(() => loading = true);
-    
-    try {
-      // Get stored offer code
-      offerCode = await insertAffiliateSdk.getStoredOfferCode();
-      
-      final offerings = await Purchases.getOfferings();
-      List<Package> packagesToUse = [];
-
-      if (offerCode != null && offerCode!.isNotEmpty) {
-        // Construct modified product IDs from base products
-        final basePackages = offerings.current?.availablePackages ?? [];
-
-        for (final basePackage in basePackages) {
-          final baseProductId = basePackage.storeProduct.identifier;
-          final modifiedProductId = '$baseProductId$offerCode';
-
-          // Search all offerings for the modified product
-          bool foundModified = false;
-          
-          for (final offering in offerings.all.values) {
-            final modifiedPackage = offering.availablePackages.firstWhere(
-              (pkg) => pkg.storeProduct.identifier == modifiedProductId,
-              orElse: () => null,
-            );
-
-            if (modifiedPackage != null) {
-              packagesToUse.add(modifiedPackage);
-              foundModified = true;
-              break;
-            }
-          }
-
-          // Fallback to base product if no modified version
-          if (!foundModified) {
-            packagesToUse.add(basePackage);
-          }
-        }
-      } else {
-        packagesToUse = offerings.current?.availablePackages ?? [];
-      }
-
-      setState(() {
-        availablePackages = packagesToUse;
-        loading = false;
-      });
-    } catch (error) {
-      print('Error fetching subscriptions: $error');
-      setState(() => loading = false);
-    }
-  }
-
-  Future<void> handlePurchase(Package package) async {
-    try {
-      await Purchases.purchasePackage(package);
-    } catch (error) {
-      print('Purchase failed: $error');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (offerCode != null && offerCode!.isNotEmpty)
-          Container(
-            padding: EdgeInsets.all(10),
-            margin: EdgeInsets.only(bottom: 15),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '🎉 Special Offer Applied: $offerCode',
-              style: TextStyle(
-                color: Colors.blue.shade700,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        
-        if (loading)
-          CircularProgressIndicator()
-        else
-          ...availablePackages.map((package) => 
-            ElevatedButton(
-              onPressed: () => handlePurchase(package),
-              child: Text('Buy: ${package.storeProduct.identifier}'),
-            ),
-          ).toList(),
-      ],
-    );
-  }
-}
-```
-
----
-
-#### Native IAP Integration Example
-
-For apps using the native `in_app_purchase` package directly:
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
-
-class NativeIAPPurchaseView extends StatefulWidget {
-  @override
-  _NativeIAPPurchaseViewState createState() => _NativeIAPPurchaseViewState();
-}
-
-class _NativeIAPPurchaseViewState extends State<NativeIAPPurchaseView> {
-  final InAppPurchase _iap = InAppPurchase.instance;
-  List<ProductDetails> availableProducts = [];
-  String? offerCode;
-  bool loading = false;
-  
-  static const String baseProductIdentifier = "oneMonthSubscription";
-
-  @override
-  void initState() {
-    super.initState();
-    fetchProducts();
-  }
-
-  String get dynamicProductIdentifier {
-    return offerCode != null && offerCode!.isNotEmpty
-        ? '$baseProductIdentifier$offerCode' // e.g., "oneMonthSubscription_oneWeekFree"
-        : baseProductIdentifier;
-  }
-
-  Future<void> fetchProducts() async {
-    setState(() => loading = true);
-    
-    try {
-      // Get stored offer code
-      offerCode = await insertAffiliateSdk.getStoredOfferCode();
-      
-      // Try to fetch the dynamic product first
-      Set<String> productIds = {dynamicProductIdentifier};
-      
-      // Also include base product as fallback
-      if (offerCode != null && offerCode!.isNotEmpty) {
-        productIds.add(baseProductIdentifier);
-      }
-      
-      final ProductDetailsResponse response = await _iap.queryProductDetails(productIds);
-      
-      if (response.notFoundIDs.isNotEmpty) {
-        print('Products not found: ${response.notFoundIDs}');
-      }
-      
-      // Prioritize the dynamic product if it exists
-      List<ProductDetails> sortedProducts = response.productDetails;
-      if (offerCode != null && offerCode!.isNotEmpty && sortedProducts.length > 1) {
-        sortedProducts.sort((a, b) => 
-          a.id == dynamicProductIdentifier ? -1 : 1
-        );
-      }
-      
-      setState(() {
-        availableProducts = sortedProducts;
-        loading = false;
-      });
-      
-      print('Loaded products for: ${productIds.join(', ')}');
-      
-    } catch (error) {
-      try {
-        // Fallback logic
-        final ProductDetailsResponse fallbackResponse = await _iap.queryProductDetails({baseProductIdentifier});
-        setState(() {
-          availableProducts = fallbackResponse.productDetails;
-          loading = false;
-        });
-      } catch (fallbackError) {
-        print('Failed to fetch base products: $fallbackError');
-        setState(() => loading = false);
-      }
-    }
-  }
-
-  Future<void> handlePurchase(String productId) async {
-   // Handle purchase is unchanged from previous examples.
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ProductDetails? primaryProduct = availableProducts.isNotEmpty ? availableProducts.first : null;
-
-    return Padding(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Premium Subscription',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 10),
-          
-          if (offerCode != null && offerCode!.isNotEmpty)
-            Container(
-              padding: EdgeInsets.all(10),
-              margin: EdgeInsets.only(bottom: 15),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '🎉 Special Offer Applied: $offerCode',
-                style: TextStyle(
-                  color: Colors.blue.shade700,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          
-          if (loading)
-            Center(child: CircularProgressIndicator())
-          else if (primaryProduct != null) ...[
-            Text(
-              primaryProduct.title,
-              style: TextStyle(fontSize: 16),
-            ),
-            SizedBox(height: 5),
-            Text(
-              'Price: ${primaryProduct.price}',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-            ),
-            SizedBox(height: 5),
-            Text(
-              'Product ID: ${primaryProduct.id}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-            ),
-            SizedBox(height: 15),
-            
-            ElevatedButton(
-              onPressed: loading ? null : () => handlePurchase(primaryProduct.id),
-              child: Text(loading ? "Processing..." : "Subscribe Now"),
-            ),
-            
-            if (primaryProduct.id == dynamicProductIdentifier && offerCode != null && offerCode!.isNotEmpty)
-              Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text(
-                  '✓ Promotional pricing applied',
-                  style: TextStyle(fontSize: 12, color: Colors.green),
-                ),
-              ),
-          ] else ...[
-            Text(
-              'Product not found: $dynamicProductIdentifier',
-              style: TextStyle(color: Colors.red),
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: fetchProducts,
-              child: Text('Retry'),
-            ),
-          ],
-          
-          if (availableProducts.length > 1) ...[
-            SizedBox(height: 20),
-            Text(
-              'Other Options:',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            ...availableProducts.skip(1).map((product) => 
-              Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: ElevatedButton(
-                  onPressed: () => handlePurchase(product.id),
-                  child: Text('${product.title} - ${product.price}'),
-                ),
-              ),
-            ).toList(),
-          ],
-        ],
-      ),
-    );
-  }
-}
-```
-
-##### Key Features of Native IAP Integration:
-
-1. **Dynamic Product Loading**: Automatically constructs product IDs using the offer code modifier
-2. **Fallback Strategy**: If the promotional product isn't found, falls back to the base product
-3. **Visual Feedback**: Shows users when promotional pricing is applied
-4. **Error Handling**: Graceful handling when products aren't available
-5. **Platform Integration**: Properly handles iOS app account tokens for affiliate tracking
-
-#### Best Practices
-
-1. **Product Setup**: Always create both base and promotional products in App Store Connect
-2. **Naming Convention**: Use consistent naming patterns for offer code modifiers
-3. **Fallback Logic**: Always implement fallback to base products if promotional ones aren't available
-4. **User Experience**: Clearly indicate when special pricing is applied
-5. **Testing**: Test both scenarios - with and without offer codes applied
-
-## Attribution Timeout
-
-The Insert Affiliate Flutter SDK now supports attribution timeout functionality, allowing you to set how long an affiliate link attribution remains active before expiring. This feature helps you control the attribution window for affiliate commissions.
-
-### How Attribution Timeout Works
-
-By default, affiliate attributions **never expire** (timeout is disabled). When a timeout is configured, attributions remain active for the specified number of seconds from when they were first set. After this period, the SDK will return `null` when calling `returnInsertAffiliateIdentifier()`, effectively expiring the attribution and preventing affiliate commissions for subsequent purchases.
-
-### Configuration
-
-#### Setting the Attribution Timeout During Initialization (Recommended)
-
-You can configure the attribution timeout period during SDK initialization:
-
-```dart
-// Set attribution timeout to 7 days (604800 seconds)
 insertAffiliateSdk = InsertAffiliateFlutterSDK(
-  companyCode: "{{ your_company_code }}",
+  companyCode: "YOUR_COMPANY_CODE",
   attributionTimeout: 604800, // 7 days in seconds
 );
-
-// Set attribution timeout to 60 days (5184000 seconds)  
-insertAffiliateSdk = InsertAffiliateFlutterSDK(
-  companyCode: "{{ your_company_code }}",
-  attributionTimeout: 5184000, // 60 days in seconds
-);
-
-// Disable attribution timeout (never expires) - this is the default
-insertAffiliateSdk = InsertAffiliateFlutterSDK(
-  companyCode: "{{ your_company_code }}",
-  attributionTimeout: 0, // Never expires (default)
-);
 ```
 
-#### Runtime Attribution Timeout Updates
-
-You can also update the attribution timeout at runtime using the `setAffiliateAttributionTimeout` method:
+**Runtime Updates:**
 
 ```dart
-// Set attribution timeout to 7 days (604800 seconds)
+// Set 7-day timeout
 await insertAffiliateSdk.setAffiliateAttributionTimeout(604800);
 
-// Set attribution timeout to 60 days (5184000 seconds)
-await insertAffiliateSdk.setAffiliateAttributionTimeout(5184000);
-
-// Disable attribution timeout (never expires)
+// Disable timeout (never expires)
 await insertAffiliateSdk.setAffiliateAttributionTimeout(0);
-```
 
-#### Getting the Current Timeout Setting
-
-You can retrieve the current timeout setting:
-
-```dart
-final timeoutSeconds = await insertAffiliateSdk.getAffiliateAttributionTimeout();
-print('Attribution expires after $timeoutSeconds seconds');
-```
-
-### Checking Attribution Validity
-
-You can check if the current attribution is still valid:
-
-```dart
+// Check if attribution is still valid
 final isValid = await insertAffiliateSdk.isAffiliateAttributionValid();
-if (isValid) {
-  print('Attribution is still active');
-} else {
-  print('Attribution has expired');
-}
-```
 
-### Getting Attribution Date
-
-You can retrieve when the attribution was first stored:
-
-```dart
+// Get when attribution was stored
 final storedDate = await insertAffiliateSdk.getAffiliateStoredDate();
-if (storedDate != null) {
-  print('Attribution was set on: ${storedDate.toLocal()}');
-}
 ```
 
-### Bypassing Timeout for Testing
+**Common Timeout Values:**
+- 1 day: `86400`
+- 7 days: `604800` (recommended)
+- 30 days: `2592000`
+- No timeout: `0` (default)
 
-When developing or testing, you may need to retrieve the affiliate identifier even if it has expired. Use the `ignoreTimeout` parameter:
+**Bypass Timeout for Testing:**
 
 ```dart
-// This will return the identifier even if attribution has expired
+// Get identifier even if attribution has expired
 final identifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier(ignoreTimeout: true);
 ```
 
-### Important Notes
+</details>
 
-1. **Default Behavior**: If no timeout is explicitly set, the default is disabled (0 = never expires)
-2. **Disabled Timeout**: Setting timeout to 0 or negative value disables the timeout (attribution never expires)
-3. **Backward Compatibility**: Existing attributions without stored dates are considered valid for backward compatibility
-4. **Attribution Reset**: Setting a new or different affiliate identifier will reset the attribution date
-5. **Same Identifier**: Re-setting the same affiliate identifier will preserve the original attribution date
+<details>
+<summary><h3>Affiliate Change Callback</h3></summary>
+
+Get notified when the affiliate identifier changes:
+
+```dart
+insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+  if (identifier != null) {
+    print('Affiliate changed: $identifier');
+
+    // Update your IAP platform
+    Purchases.setAttributes({"insert_affiliate": identifier});
+  }
+});
+```
+
+</details>
+
+---
+
+## 🔍 Troubleshooting
+
+### Initialization Issues
+
+**Error:** "Company code is not set"
+- **Cause:** SDK not initialized or method called before initialization
+- **Solution:** Initialize SDK in `main()` before `runApp()`
+
+### Deep Linking Issues
+
+**Problem:** Deep link opens browser instead of app
+- **Cause:** Missing or incorrect URL scheme configuration
+- **Solution:**
+  - iOS: Add URL scheme to Info.plist and configure associated domains
+  - Android: Add intent filters to AndroidManifest.xml
+
+**Problem:** "No affiliate identifier found"
+- **Cause:** User hasn't clicked an affiliate link yet
+- **Solution:** Test with simulator/emulator using `adb shell` or `xcrun simctl openurl`
+
+### Purchase Tracking Issues
+
+**Problem:** Purchases not appearing in dashboard
+- **Cause:** Webhook not configured or affiliate identifier not passed to IAP platform
+- **Solution:**
+  - Verify webhook URL and authorization headers
+  - For RevenueCat: Confirm `insert_affiliate` attribute is set before purchase
+  - Enable verbose logging and check console for errors
+
+### Verbose Logging
+
+Enable detailed logs during development:
+
+```dart
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "YOUR_COMPANY_CODE",
+  verboseLogging: true,
+);
+```
+
+---
+
+## 📚 Support
+
+- **Documentation**: [docs.insertaffiliate.com](https://docs.insertaffiliate.com)
+- **Branch.io Guide**: [docs/deep-linking-branch.md](docs/deep-linking-branch.md)
+- **AppsFlyer Guide**: [docs/deep-linking-appsflyer.md](docs/deep-linking-appsflyer.md)
+- **Offer Codes Guide**: [docs/dynamic-offer-codes.md](docs/dynamic-offer-codes.md)
+- **Dashboard**: [app.insertaffiliate.com](https://app.insertaffiliate.com)
+- **Issues**: [GitHub Issues](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk/issues)
+
+---
+
+**Need help?** Check our [documentation](https://docs.insertaffiliate.com) or [contact support](https://app.insertaffiliate.com/help).

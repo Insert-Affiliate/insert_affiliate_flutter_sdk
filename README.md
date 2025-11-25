@@ -121,8 +121,8 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
 |--------|----------|------------|------------|
 | [**RevenueCat**](#option-1-revenuecat-recommended) | Most developers, managed infrastructure | ~10 min | Simple |
 | [**Iaptic**](#option-2-iaptic) | Custom requirements, direct control | ~15 min | Medium |
-| [**App Store Direct**](#option-3-app-store-direct-beta) | No 3rd party fees (iOS subscriptions only) | ~20 min | Medium |
-| [**Google Play Direct**](#option-4-google-play-direct-beta) | No 3rd party fees (Android) | ~20 min | Medium |
+| [**App Store Direct**](#option-3-app-store-direct) | No 3rd party fees (iOS) | ~20 min | Medium |
+| [**Google Play Direct**](#option-4-google-play-direct) | No 3rd party fees (Android) | ~20 min | Medium |
 
 <details open>
 <summary><h4>Option 1: RevenueCat (Recommended)</h4></summary>
@@ -228,9 +228,7 @@ class _MyAppState extends State<MyApp> {
 </details>
 
 <details>
-<summary><h4>Option 3: App Store Direct (Beta)</h4></summary>
-
-**Note:** Currently supports subscriptions only. Consumables and one-off purchases are not yet supported.
+<summary><h4>Option 3: App Store Direct</h4></summary>
 
 **Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-store-purchase-integration#1-apple-app-store-server-notifications) and complete the App Store Server Notifications setup.
 
@@ -261,7 +259,7 @@ void _buySubscription(ProductDetails product) async {
 </details>
 
 <details>
-<summary><h4>Option 4: Google Play Direct (Beta)</h4></summary>
+<summary><h4>Option 4: Google Play Direct</h4></summary>
 
 **Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-google-play-store-purchase-integration) and complete the RTDN setup.
 
@@ -300,12 +298,12 @@ void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) async {
 
 | Provider | Best For | Complexity | Setup Guide |
 |----------|----------|------------|-------------|
-| [**Insert Links**](#option-1-insert-links-beta) | Simple setup, no 3rd party | Simple | [View](#option-1-insert-links-beta) |
+| [**Insert Links**](#option-1-insert-links) | Simple setup, no 3rd party | Simple | [View](#option-1-insert-links) |
 | [**Branch.io**](#option-2-branchio) | Robust attribution, deferred deep linking | Medium | [View](#option-2-branchio) |
 | [**AppsFlyer**](#option-3-appsflyer) | Enterprise analytics, comprehensive attribution | Medium | [View](#option-3-appsflyer) |
 
 <details open>
-<summary><h4>Option 1: Insert Links (Beta)</h4></summary>
+<summary><h4>Option 1: Insert Links</h4></summary>
 
 Insert Links is Insert Affiliate's built-in deep linking solution.
 

@@ -156,6 +156,94 @@ class _MyAppState extends State<MyApp> {
 }
 ```
 
+### Example with Adapty
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:appsflyer_sdk/appsflyer_sdk.dart';
+import 'package:adapty_flutter/adapty_flutter.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+late AppsflyerSdk _appsflyerSdk;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final AppsFlyerOptions appsFlyerOptions = AppsFlyerOptions(
+    afDevKey: "YOUR_APPSFLYER_DEV_KEY",
+    appId: "YOUR_IOS_APP_ID",
+    showDebug: true,
+  );
+  _appsflyerSdk = AppsflyerSdk(appsFlyerOptions);
+
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "YOUR_COMPANY_CODE",
+  );
+
+  runApp(MyApp());
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeAppsFlyer();
+  }
+
+  Future<void> _initializeAppsFlyer() async {
+    // Initialize Adapty
+    await Adapty().activate(
+      configuration: AdaptyConfiguration(apiKey: 'YOUR_ADAPTY_PUBLIC_KEY')
+        ..withLogLevel(AdaptyLogLevel.verbose),
+    );
+
+    await _appsflyerSdk.initSdk(
+      registerConversionDataCallback: true,
+      registerOnDeepLinkingCallback: true,
+    );
+
+    _appsflyerSdk.onDeepLinking((deepLinkResult) async {
+      if (deepLinkResult.status == Status.FOUND) {
+        final deepLinkValue = deepLinkResult.deepLink?.deepLinkValue;
+        if (deepLinkValue != null && deepLinkValue.isNotEmpty) {
+          await insertAffiliateSdk.setInsertAffiliateIdentifier(deepLinkValue);
+
+          final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+          if (affiliateId != null) {
+            final builder = AdaptyProfileParametersBuilder()
+              ..setCustomStringAttribute(affiliateId, 'insert_affiliate');
+            await Adapty().updateProfile(builder.build());
+          }
+        }
+      }
+    });
+
+    _appsflyerSdk.onInstallConversionData((installConversionData) async {
+      if (installConversionData?['af_status'] == 'Non-organic') {
+        final affiliateLink = installConversionData?['media_source'] ??
+                             installConversionData?['campaign'];
+        if (affiliateLink != null) {
+          await insertAffiliateSdk.setInsertAffiliateIdentifier(affiliateLink);
+
+          final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+          if (affiliateId != null) {
+            final builder = AdaptyProfileParametersBuilder()
+              ..setCustomStringAttribute(affiliateId, 'insert_affiliate');
+            await Adapty().updateProfile(builder.build());
+          }
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(home: HomePage());
+  }
+}
+```
+
 ### Example with Apphud
 
 ```dart

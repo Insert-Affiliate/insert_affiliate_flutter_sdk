@@ -85,8 +85,49 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
     }
     
+    // Report SDK initialization for onboarding verification (fire and forget)
+    _reportSdkInitIfNeeded();
+
     if (_verboseLogging) {
       print('[Insert Affiliate] [VERBOSE] SDK initialization completed');
+    }
+  }
+
+  /// Reports SDK initialization to the backend for onboarding verification.
+  /// Only reports once per install to minimize server load.
+  Future<void> _reportSdkInitIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Only report once per install
+      final alreadyReported = prefs.getBool('sdk_init_reported') ?? false;
+      if (alreadyReported) {
+        return;
+      }
+
+      if (_verboseLogging) {
+        print('[Insert Affiliate] Reporting SDK initialization for onboarding verification...');
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.insertaffiliate.com/V1/onboarding/sdk-init'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'companyId': companyCode}),
+      );
+
+      if (response.statusCode == 200) {
+        await prefs.setBool('sdk_init_reported', true);
+        if (_verboseLogging) {
+          print('[Insert Affiliate] SDK initialization reported successfully');
+        }
+      } else if (_verboseLogging) {
+        print('[Insert Affiliate] SDK initialization report failed with status: ${response.statusCode}');
+      }
+    } catch (error) {
+      // Silently fail - this is non-critical telemetry
+      if (_verboseLogging) {
+        print('[Insert Affiliate] SDK initialization report error: $error');
+      }
     }
   }
 

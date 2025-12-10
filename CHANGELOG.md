@@ -1,3 +1,6 @@
+## 1.4.0
+Adapty integration
+
 ## 1.3.0
 Major feature release: Affiliate Details & Short Code Validation
 - NEW: `getAffiliateDetails()` method to retrieve affiliate information without setting identifier

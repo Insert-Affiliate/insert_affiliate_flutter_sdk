@@ -14,6 +14,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier);
 
+/// Source types for affiliate association tracking
+enum AffiliateAssociationSource {
+  deepLinkIos,       // iOS custom URL scheme (ia-companycode://shortcode)
+  deepLinkAndroid,   // Android deep link with ?insertAffiliate= param
+  installReferrer,   // Android Play Store install referrer
+  clipboardMatch,    // iOS clipboard UUID match from backend
+  shortCodeManual,   // Developer called setShortCode()
+  referringLink,     // Developer called setInsertAffiliateIdentifier()
+}
+
 /// Affiliate details returned from the API
 class AffiliateDetails {
   final String affiliateName;
@@ -85,8 +95,121 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
     }
     
+    // Report SDK initialization for onboarding verification (fire and forget)
+    _reportSdkInitIfNeeded();
+
     if (_verboseLogging) {
       print('[Insert Affiliate] [VERBOSE] SDK initialization completed');
+    }
+  }
+
+  /// Reports SDK initialization to the backend for onboarding verification.
+  /// Only reports once per install to minimize server load.
+  Future<void> _reportSdkInitIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Only report once per install
+      final alreadyReported = prefs.getBool('sdk_init_reported') ?? false;
+      if (alreadyReported) {
+        return;
+      }
+
+      if (_verboseLogging) {
+        print('[Insert Affiliate] Reporting SDK initialization for onboarding verification...');
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.insertaffiliate.com/V1/onboarding/sdk-init'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'companyId': companyCode}),
+      );
+
+      if (response.statusCode == 200) {
+        await prefs.setBool('sdk_init_reported', true);
+        if (_verboseLogging) {
+          print('[Insert Affiliate] SDK initialization reported successfully');
+        }
+      } else if (_verboseLogging) {
+        print('[Insert Affiliate] SDK initialization report failed with status: ${response.statusCode}');
+      }
+    } catch (error) {
+      // Silently fail - this is non-critical telemetry
+      if (_verboseLogging) {
+        print('[Insert Affiliate] SDK initialization report error: $error');
+      }
+    }
+  }
+
+  /// Reports a new affiliate association to the backend for tracking.
+  /// Only reports each unique affiliateIdentifier once to prevent duplicates.
+  Future<void> _reportAffiliateAssociationIfNeeded(
+    String affiliateIdentifier,
+    AffiliateAssociationSource source,
+  ) async {
+    try {
+      if (companyCode.isEmpty) {
+        verboseLog('Cannot report affiliate association: no company code available');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get the set of already-reported affiliate identifiers
+      final reportedAssociationsJson = prefs.getString('reported_affiliate_associations');
+      final List<String> reportedAssociations = reportedAssociationsJson != null
+          ? List<String>.from(jsonDecode(reportedAssociationsJson))
+          : [];
+
+      // Check if this affiliate identifier has already been reported
+      if (reportedAssociations.contains(affiliateIdentifier)) {
+        verboseLog('Affiliate association already reported for: $affiliateIdentifier, skipping');
+        return;
+      }
+
+      // Map enum to string for API
+      final sourceString = _sourceToString(source);
+      verboseLog('Reporting new affiliate association: $affiliateIdentifier (source: $sourceString)');
+
+      final response = await http.post(
+        Uri.parse('https://api.insertaffiliate.com/V1/onboarding/affiliate-associated'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'companyId': companyCode,
+          'affiliateIdentifier': affiliateIdentifier,
+          'source': sourceString,
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Add to reported set and persist
+        reportedAssociations.add(affiliateIdentifier);
+        await prefs.setString('reported_affiliate_associations', jsonEncode(reportedAssociations));
+        verboseLog('Affiliate association reported successfully for: $affiliateIdentifier');
+      } else {
+        verboseLog('Affiliate association report failed with status: ${response.statusCode}');
+      }
+    } catch (error) {
+      // Silently fail - this is non-critical telemetry
+      verboseLog('Affiliate association report error: $error');
+    }
+  }
+
+  String _sourceToString(AffiliateAssociationSource source) {
+    switch (source) {
+      case AffiliateAssociationSource.deepLinkIos:
+        return 'deep_link_ios';
+      case AffiliateAssociationSource.deepLinkAndroid:
+        return 'deep_link_android';
+      case AffiliateAssociationSource.installReferrer:
+        return 'install_referrer';
+      case AffiliateAssociationSource.clipboardMatch:
+        return 'clipboard_match';
+      case AffiliateAssociationSource.shortCodeManual:
+        return 'short_code_manual';
+      case AffiliateAssociationSource.referringLink:
+        return 'referring_link';
     }
   }
 
@@ -125,7 +248,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     print('[Insert Affiliate] Short code validated successfully for affiliate: ${affiliateDetails.affiliateName}');
 
     // If validation passes, set the Insert Affiliate Identifier
-    await _storeInsertAffiliateReferringLink(shortCode);
+    await storeInsertAffiliateIdentifier(link: shortCode, source: AffiliateAssociationSource.shortCodeManual);
 
     notifyListeners();
     return true;
@@ -242,7 +365,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     if (isShortCode(referringLink)) {
       print('[Insert Affiliate] Referring link is already a short code.');
       verboseLog('Link is already a short code, storing directly');
-      await _storeInsertAffiliateReferringLink(referringLink);
+      await storeInsertAffiliateIdentifier(link: referringLink, source: AffiliateAssociationSource.referringLink);
       return;
     }
 
@@ -271,12 +394,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
           print('[Insert Affiliate] Short link received: $shortLink');
           verboseLog('Successfully converted to short link: $shortLink');
           verboseLog('Storing short link...');
-          await _storeInsertAffiliateReferringLink(shortLink);
+          await storeInsertAffiliateIdentifier(link: shortLink, source: AffiliateAssociationSource.referringLink);
           verboseLog('Short link stored successfully');
           return;
         } else { // If theres an issue, store what was passed to save for later potential processing/recovery
           verboseLog('Unexpected API response, storing original link as fallback');
-          await _storeInsertAffiliateReferringLink(referringLink);
+          await storeInsertAffiliateIdentifier(link: referringLink, source: AffiliateAssociationSource.referringLink);
         }
       }
     } catch (error) {
@@ -285,34 +408,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
 
     verboseLog('Storing original link as fallback');
-    await _storeInsertAffiliateReferringLink(referringLink);
-  }
-
-  Future<void> _storeInsertAffiliateReferringLink(String referringLink) async {
-    print('[Insert Affiliate] Storing affiliate identifier: $referringLink');
-    verboseLog('Saving referrer link to SharedPreferences...');
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Check if the referrer link is different from what's already stored
-    final existingLink = prefs.getString('referring_link');
-    final isNewOrDifferent = existingLink != referringLink;
-    
-    await prefs.setString('referring_link', referringLink);
-    
-    // Only store the attribution date if this is a new or different affiliate identifier
-    if (isNewOrDifferent) {
-      final attributionDate = DateTime.now().toIso8601String();
-      await prefs.setString('affiliate_attribution_date', attributionDate);
-      verboseLog('New affiliate identifier stored with fresh attribution date');
-    } else {
-      verboseLog('Same affiliate identifier, preserving existing attribution date');
-    }
-    
-    verboseLog('Referrer link saved to SharedPreferences successfully');
-
-    verboseLog('Attempting to fetch offer code for stored affiliate identifier...');
-    await retrieveAndStoreOfferCode(referringLink);
-    notifyListeners();
+    await storeInsertAffiliateIdentifier(link: referringLink, source: AffiliateAssociationSource.referringLink);
   }
 
   Future<String?> returnInsertAffiliateIdentifier({bool ignoreTimeout = false}) async {
@@ -773,7 +869,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     if (insertAffiliate != null && insertAffiliate.isNotEmpty) {
       verboseLog('Found insertAffiliate parameter: $insertAffiliate');
-      await storeInsertAffiliateIdentifier(link: insertAffiliate);
+      await storeInsertAffiliateIdentifier(link: insertAffiliate, source: AffiliateAssociationSource.deepLinkAndroid);
       return true;
     } else {
       verboseLog('No insertAffiliate parameter found in Android deep link');
@@ -810,7 +906,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
 
     // Store the short code as the referring link
-    await storeInsertAffiliateIdentifier(link: upperCaseShortCode);
+    await storeInsertAffiliateIdentifier(link: upperCaseShortCode, source: AffiliateAssociationSource.deepLinkIos);
 
     // Collect and send enhanced system info to backend
     try {
@@ -919,7 +1015,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     if (insertAffiliate != null && insertAffiliate.isNotEmpty) {
       verboseLog('Found insertAffiliate parameter, setting as affiliate identifier: $insertAffiliate');
-      await storeInsertAffiliateIdentifier(link: insertAffiliate);
+      await storeInsertAffiliateIdentifier(link: insertAffiliate, source: AffiliateAssociationSource.installReferrer);
       return true;
     } else {
       verboseLog('No insertAffiliate parameter found in referrer data');
@@ -1186,7 +1282,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
             final matchedShortCode = responseData['matched_affiliate_shortCode'] as String;
             if (matchedShortCode.isNotEmpty) {
               verboseLog('Storing matched short code from backend: $matchedShortCode');
-              await storeInsertAffiliateIdentifier(link: matchedShortCode);
+              await storeInsertAffiliateIdentifier(link: matchedShortCode, source: AffiliateAssociationSource.clipboardMatch);
             }
           }
         } catch (parseError) {
@@ -1208,27 +1304,31 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   // MARK: Updated Store Method with Callback
-  Future<void> storeInsertAffiliateIdentifier({required String link}) async {
-    print('[Insert Affiliate] Storing affiliate identifier: $link');
+  Future<void> storeInsertAffiliateIdentifier({
+    required String link,
+    required AffiliateAssociationSource source,
+  }) async {
+    print('[Insert Affiliate] Storing affiliate identifier: $link (source: ${_sourceToString(source)})');
     verboseLog('Updating state with referrer link: $link');
     final prefs = await SharedPreferences.getInstance();
     verboseLog('Saving referrer link to storage...');
-    
+
     // Check if the referrer link is different from what's already stored
     final existingLink = prefs.getString(_referrerLinkKey);
     final isNewOrDifferent = existingLink != link;
-    
-    await prefs.setString(_referrerLinkKey, link);
-    
-    // Only store the attribution date if this is a new or different affiliate identifier
-    if (isNewOrDifferent) {
-      final attributionDate = DateTime.now().toIso8601String();
-      await prefs.setString('affiliate_attribution_date', attributionDate);
-      verboseLog('New affiliate identifier stored with fresh attribution date');
-    } else {
-      verboseLog('Same affiliate identifier, preserving existing attribution date');
+
+    if (!isNewOrDifferent) {
+      verboseLog('Link $link is already stored, skipping duplicate storage');
+      return;
     }
-    
+
+    await prefs.setString(_referrerLinkKey, link);
+
+    // Store the attribution date for new affiliate identifier
+    final attributionDate = DateTime.now().toIso8601String();
+    await prefs.setString('affiliate_attribution_date', attributionDate);
+    verboseLog('New affiliate identifier stored with fresh attribution date');
+
     verboseLog('Referrer link saved to storage successfully');
 
     // Automatically fetch and store offer code
@@ -1240,6 +1340,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       final currentIdentifier = await returnInsertAffiliateIdentifier(ignoreTimeout: true);
       verboseLog('Triggering callback with identifier: $currentIdentifier');
       _insertAffiliateIdentifierChangeCallback!(currentIdentifier);
+    }
+
+    // Report this new affiliate association to the backend (fire and forget)
+    final fullIdentifier = await returnInsertAffiliateIdentifier(ignoreTimeout: true);
+    if (fullIdentifier != null) {
+      _reportAffiliateAssociationIfNeeded(fullIdentifier, source);
     }
   }
 

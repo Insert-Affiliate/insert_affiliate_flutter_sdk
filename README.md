@@ -120,9 +120,10 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
 | Method | Best For | Setup Time | Complexity |
 |--------|----------|------------|------------|
 | [**RevenueCat**](#option-1-revenuecat-recommended) | Most developers, managed infrastructure | ~10 min | Simple |
-| [**Iaptic**](#option-2-iaptic) | Custom requirements, direct control | ~15 min | Medium |
-| [**App Store Direct**](#option-3-app-store-direct) | No 3rd party fees (iOS) | ~20 min | Medium |
-| [**Google Play Direct**](#option-4-google-play-direct) | No 3rd party fees (Android) | ~20 min | Medium |
+| [**Adapty**](#option-2-adapty) | Paywall A/B testing, analytics | ~10 min | Simple |
+| [**Iaptic**](#option-3-iaptic) | Custom requirements, direct control | ~15 min | Medium |
+| [**App Store Direct**](#option-4-app-store-direct) | No 3rd party fees (iOS) | ~20 min | Medium |
+| [**Google Play Direct**](#option-5-google-play-direct) | No 3rd party fees (Android) | ~20 min | Medium |
 
 <details open>
 <summary><h4>Option 1: RevenueCat (Recommended)</h4></summary>
@@ -176,7 +177,130 @@ class _MyAppState extends State<MyApp> {
 </details>
 
 <details>
-<summary><h4>Option 2: Iaptic</h4></summary>
+<summary><h4>Option 2: Adapty</h4></summary>
+
+**Step 1: Install Adapty SDK**
+
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  adapty_flutter: ^3.2.1
+```
+
+Then run:
+```bash
+flutter pub get
+```
+
+Complete the [Adapty Flutter SDK installation](https://adapty.io/docs/sdk-installation-flutter) for any additional platform-specific setup.
+
+**Step 2: Code Setup**
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:adapty_flutter/adapty_flutter.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Insert Affiliate SDK
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "YOUR_COMPANY_CODE",
+  );
+
+  runApp(MyApp());
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeSDKs();
+  }
+
+  Future<void> _initializeSDKs() async {
+    // Initialize Adapty
+    await Adapty().activate(
+      configuration: AdaptyConfiguration(apiKey: 'YOUR_ADAPTY_PUBLIC_KEY')
+        ..withLogLevel(AdaptyLogLevel.verbose),
+    );
+
+    // Set up callback for affiliate identifier changes
+    insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
+      if (identifier != null && identifier.isNotEmpty) {
+        await _updateAdaptyWithAffiliateId(identifier);
+      }
+    });
+
+    // Check for existing affiliate identifier
+    final existingId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+    if (existingId != null && existingId.isNotEmpty) {
+      await _updateAdaptyWithAffiliateId(existingId);
+    }
+  }
+
+  Future<void> _updateAdaptyWithAffiliateId(String affiliateId) async {
+    final builder = AdaptyProfileParametersBuilder()
+      ..setCustomStringAttribute(affiliateId, 'insert_affiliate');
+    await Adapty().updateProfile(builder.build());
+  }
+}
+```
+
+**Step 3: Ensure Attribution Before Purchase**
+
+```dart
+Future<void> _makePurchase(AdaptyPaywallProduct product) async {
+  // Always ensure affiliate ID is set before purchase
+  final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+  if (affiliateId != null && affiliateId.isNotEmpty) {
+    final builder = AdaptyProfileParametersBuilder()
+      ..setCustomStringAttribute(affiliateId, 'insert_affiliate');
+    await Adapty().updateProfile(builder.build());
+  }
+
+  // Now make the purchase
+  final result = await Adapty().makePurchase(product: product);
+  // Handle result...
+}
+```
+
+**Step 4: Webhook Setup**
+
+1. In your [Insert Affiliate dashboard](https://app.insertaffiliate.com/settings):
+   - Set **In-App Purchase Verification** to `Adapty`
+   - Copy the **Adapty Webhook URL**
+   - Copy the **Adapty Webhook Authorization Header** value
+
+2. In the [Adapty Dashboard](https://app.adapty.io/integrations):
+   - Navigate to **Integrations** → **Webhooks**
+   - Set **Production URL** to the webhook URL from Insert Affiliate
+   - Set **Sandbox URL** to the same webhook URL
+   - Paste the authorization header value into **Authorization header value**
+   - Enable these options:
+     - **Exclude historical events**
+     - **Send attribution**
+     - **Send trial price**
+     - **Send user attributes**
+   - Save the configuration
+
+**Step 5: Verify Integration**
+
+To confirm the affiliate identifier is set correctly:
+1. Go to [app.adapty.io/profiles/users](https://app.adapty.io/profiles/users)
+2. Find the test user who made a purchase
+3. Look for `insert_affiliate` in **Custom attributes** with format: `{SHORT_CODE}-{UUID}`
+
+✅ **Adapty setup complete!**
+
+</details>
+
+<details>
+<summary><h4>Option 3: Iaptic</h4></summary>
 
 **Step 1: Code Setup**
 
@@ -228,7 +352,7 @@ class _MyAppState extends State<MyApp> {
 </details>
 
 <details>
-<summary><h4>Option 3: App Store Direct</h4></summary>
+<summary><h4>Option 4: App Store Direct</h4></summary>
 
 **Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-store-purchase-integration#1-apple-app-store-server-notifications) and complete the App Store Server Notifications setup.
 
@@ -259,7 +383,7 @@ void _buySubscription(ProductDetails product) async {
 </details>
 
 <details>
-<summary><h4>Option 4: Google Play Direct</h4></summary>
+<summary><h4>Option 5: Google Play Direct</h4></summary>
 
 **Step 1:** Visit [our docs](https://docs.insertaffiliate.com/direct-google-play-store-purchase-integration) and complete the RTDN setup.
 
@@ -342,13 +466,18 @@ void main() async {
   );
 
   // Set up callback for affiliate identifier changes
-  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
     if (identifier != null) {
       // For RevenueCat:
-      // Purchases.setAttributes({"insert_affiliate": identifier});
+      // await Purchases.setAttributes({"insert_affiliate": identifier});
+
+      // For Adapty:
+      // final builder = AdaptyProfileParametersBuilder()
+      //   ..setCustomStringAttribute(identifier, 'insert_affiliate');
+      // await Adapty().updateProfile(builder.build());
 
       // For Apphud:
-      // Apphud.setUserProperty(key: "insert_affiliate", value: identifier, setOnce: false);
+      // await Apphud.setUserProperty(key: "insert_affiliate", value: identifier, setOnce: false);
     }
   });
 

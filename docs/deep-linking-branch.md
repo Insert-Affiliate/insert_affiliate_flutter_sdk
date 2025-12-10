@@ -93,6 +93,80 @@ class _MyAppState extends State<MyApp> {
 }
 ```
 
+### Example with Adapty
+
+```dart
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_branch_sdk/flutter_branch_sdk.dart';
+import 'package:adapty_flutter/adapty_flutter.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart';
+
+late final InsertAffiliateFlutterSDK insertAffiliateSdk;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  insertAffiliateSdk = InsertAffiliateFlutterSDK(
+    companyCode: "YOUR_COMPANY_CODE",
+  );
+
+  runApp(MyApp());
+}
+
+class _MyAppState extends State<MyApp> {
+  late StreamSubscription<Map> _branchStreamSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAsyncDependencies();
+  }
+
+  Future<void> _initializeAsyncDependencies() async {
+    // Initialize Adapty
+    await Adapty().activate(
+      configuration: AdaptyConfiguration(apiKey: 'YOUR_ADAPTY_PUBLIC_KEY')
+        ..withLogLevel(AdaptyLogLevel.verbose),
+    );
+
+    // Handle initial affiliate identifier
+    await handleAffiliateIdentifier();
+
+    // Listen for Branch deep links
+    _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) async {
+      if (data.containsKey("+clicked_branch_link") && data["+clicked_branch_link"] == true) {
+        final referringLink = data["~referring_link"];
+        insertAffiliateSdk.setInsertAffiliateIdentifier(referringLink);
+        await handleAffiliateIdentifier();
+      }
+    }, onError: (error) {
+      print('Branch session error: ${error.toString()}');
+    });
+  }
+
+  Future<void> handleAffiliateIdentifier() async {
+    final value = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+    if (value != null && value.isNotEmpty) {
+      final builder = AdaptyProfileParametersBuilder()
+        ..setCustomStringAttribute(value, 'insert_affiliate');
+      await Adapty().updateProfile(builder.build());
+    }
+  }
+
+  @override
+  void dispose() {
+    _branchStreamSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(home: HomePage());
+  }
+}
+```
+
 ### Example with Apphud
 
 ```dart

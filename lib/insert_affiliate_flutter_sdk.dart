@@ -920,14 +920,44 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   }
 
   // MARK: URL Parsing Utilities
+
+  /// Parse shortcode from query parameter (new format: scheme://insert-affiliate?code=SHORTCODE)
+  String? parseShortCodeFromQuery(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final code = uri.queryParameters['code'];
+      if (code != null && code.isNotEmpty) {
+        verboseLog('Found short code in query parameter: $code');
+        return code;
+      }
+      return null;
+    } catch (error) {
+      verboseLog('Error parsing short code from query: $error');
+      return null;
+    }
+  }
+
   String? parseShortCodeFromURLString(String url) {
     try {
-      // For custom schemes like ia-companycode://shortcode, everything after :// is the short code
+      // First try to extract from query parameter (new format: scheme://insert-affiliate?code=SHORTCODE)
+      final queryCode = parseShortCodeFromQuery(url);
+      if (queryCode != null) {
+        print('[Insert Affiliate] Found short code in query parameter: $queryCode');
+        return queryCode;
+      }
+
+      // Fall back to path format (legacy: scheme://SHORTCODE)
       final match = RegExp(r'^[^:]+://(.+)').firstMatch(url);
       if (match != null) {
-        final shortCode = match.group(1)!;
+        var shortCode = match.group(1)!;
         // Remove leading slash if present
-        return shortCode.startsWith('/') ? shortCode.substring(1) : shortCode;
+        shortCode = shortCode.startsWith('/') ? shortCode.substring(1) : shortCode;
+        // If the path is 'insert-affiliate' (from new format without code param), return null
+        if (shortCode.toLowerCase() == 'insert-affiliate' || shortCode.toLowerCase().startsWith('insert-affiliate?')) {
+          return null;
+        }
+        print('[Insert Affiliate] Found short code in URL path (legacy format): $shortCode');
+        return shortCode;
       }
       return null;
     } catch (error) {

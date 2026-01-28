@@ -152,9 +152,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   void handleAffiliateIdentifier() {
-    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) async {
       if (value != null && value.isNotEmpty) {
-        Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.syncAttributesAndOfferingsIfNeeded();
       }
     });
   }
@@ -470,6 +471,7 @@ void main() async {
     if (identifier != null) {
       // For RevenueCat:
       // await Purchases.setAttributes({"insert_affiliate": identifier});
+      // await Purchases.syncAttributesAndOfferingsIfNeeded();
 
       // For Adapty:
       // final builder = AdaptyProfileParametersBuilder()
@@ -525,9 +527,10 @@ _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
     insertAffiliateSdk.setInsertAffiliateIdentifier(data["~referring_link"]);
 
     // For RevenueCat: Update attributes
-    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) async {
       if (value != null) {
-        Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.syncAttributesAndOfferingsIfNeeded();
       }
     });
   }
@@ -559,7 +562,8 @@ _appsflyerSdk.onDeepLinking((deepLinkResult) async {
       // For RevenueCat: Update attributes
       final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
       if (affiliateId != null) {
-        Purchases.setAttributes({"insert_affiliate": affiliateId});
+        await Purchases.setAttributes({"insert_affiliate": affiliateId});
+        await Purchases.syncAttributesAndOfferingsIfNeeded();
       }
     }
   }
@@ -755,12 +759,13 @@ final identifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier(igno
 Get notified when the affiliate identifier changes:
 
 ```dart
-insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) {
+insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
   if (identifier != null) {
     print('Affiliate changed: $identifier');
 
     // Update your IAP platform
-    Purchases.setAttributes({"insert_affiliate": identifier});
+    await Purchases.setAttributes({"insert_affiliate": identifier});
+    await Purchases.syncAttributesAndOfferingsIfNeeded();
   }
 });
 ```

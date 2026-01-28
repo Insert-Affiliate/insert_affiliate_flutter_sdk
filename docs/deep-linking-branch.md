@@ -73,9 +73,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   void handleAffiliateIdentifier() {
-    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) {
+    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) async {
       if (value != null && value.isNotEmpty) {
-        Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.setAttributes({"insert_affiliate": value});
+        await Purchases.syncAttributesAndOfferingsIfNeeded();
       }
     });
   }

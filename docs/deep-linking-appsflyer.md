@@ -126,7 +126,8 @@ class _MyAppState extends State<MyApp> {
           // Set RevenueCat attributes
           final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
           if (affiliateId != null) {
-            Purchases.setAttributes({"insert_affiliate": affiliateId});
+            await Purchases.setAttributes({"insert_affiliate": affiliateId});
+            await Purchases.syncAttributesAndOfferingsIfNeeded();
           }
         }
       }
@@ -142,7 +143,8 @@ class _MyAppState extends State<MyApp> {
 
           final affiliateId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
           if (affiliateId != null) {
-            Purchases.setAttributes({"insert_affiliate": affiliateId});
+            await Purchases.setAttributes({"insert_affiliate": affiliateId});
+            await Purchases.syncAttributesAndOfferingsIfNeeded();
           }
         }
       }

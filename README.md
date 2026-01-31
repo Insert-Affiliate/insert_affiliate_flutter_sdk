@@ -150,11 +150,16 @@ class _MyAppState extends State<MyApp> {
     await Purchases.configure(PurchasesConfiguration("YOUR_REVENUECAT_API_KEY"));
 
     // Set up callback to sync affiliate identifier to RevenueCat whenever it changes
+    // Note: Use preventAffiliateTransfer in constructor to block affiliate changes in the SDK
     insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offerCode) async {
       if (identifier == null) return;
 
       // Ensure subscriber exists by fetching customer info first
-      await Purchases.getCustomerInfo();
+      final customerInfo = await Purchases.getCustomerInfo();
+
+      // OPTIONAL: Prevent attribution for existing subscribers
+      // Uncomment to ensure affiliates only earn from users they actually brought:
+      // if (customerInfo.entitlements.active.isNotEmpty) return; // User already subscribed, don't attribute
 
       // Get expiry timestamp for insert_timedout
       final expiryTimestamp = await insertAffiliateSdk.getAffiliateExpiryTimestamp();

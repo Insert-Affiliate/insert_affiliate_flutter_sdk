@@ -100,6 +100,7 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
   insertLinksEnabled: true,          // Enable Insert Links (built-in deep linking)
   insertLinksClipboardEnabled: true, // Enable clipboard attribution (triggers permission prompt)
   attributionTimeout: 604800,        // 7 days attribution timeout in seconds
+  preventAffiliateTransfer: true,    // Protect original affiliate from being overwritten
 );
 ```
 
@@ -108,6 +109,7 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
 - `insertLinksEnabled`: Set to `true` if using Insert Links, `false` if using Branch/AppsFlyer
 - `insertLinksClipboardEnabled`: Enables clipboard-based attribution for Insert Links
 - `attributionTimeout`: How long affiliate attribution lasts in seconds (0 = never expires)
+- `preventAffiliateTransfer`: When `true`, blocks new affiliates from overwriting existing attribution (default: `false`)
 
 </details>
 
@@ -147,17 +149,51 @@ class _MyAppState extends State<MyApp> {
     // Initialize RevenueCat
     await Purchases.configure(PurchasesConfiguration("YOUR_REVENUECAT_API_KEY"));
 
-    // Handle affiliate identifier
-    handleAffiliateIdentifier();
+    // Set up callback to sync affiliate identifier to RevenueCat whenever it changes
+    insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offerCode) async {
+      if (identifier == null) return;
+
+      // Ensure subscriber exists by fetching customer info first
+      await Purchases.getCustomerInfo();
+
+      // Set RevenueCat attributes
+      var attributes = {
+        "insert_affiliate": identifier,
+        "insert_timedout": "",  // Clear timeout flag on new attribution
+      };
+      if (offerCode != null) {
+        attributes["affiliateOfferCode"] = offerCode;
+      }
+
+      await Purchases.setAttributes(attributes);
+      print('[RevenueCat] Set attributes: $attributes');
+
+      // Sync attributes and refresh offerings for targeting
+      await Purchases.syncAttributesAndOfferingsIfNeeded();
+    });
+
+    // Check for existing affiliate identifier
+    final existingId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
+    if (existingId != null) {
+      await Purchases.setAttributes({"insert_affiliate": existingId});
+    }
+
+    // Check if attribution has expired and set insert_timedout if so
+    await _checkAndClearExpiredAttribution();
   }
 
-  void handleAffiliateIdentifier() {
-    insertAffiliateSdk.returnInsertAffiliateIdentifier().then((value) async {
-      if (value != null && value.isNotEmpty) {
-        await Purchases.setAttributes({"insert_affiliate": value});
-        await Purchases.syncAttributesAndOfferingsIfNeeded();
+  Future<void> _checkAndClearExpiredAttribution() async {
+    final isValid = await insertAffiliateSdk.isAffiliateAttributionValid();
+    if (!isValid) {
+      final expiryTimestamp = await insertAffiliateSdk.getAffiliateExpiryTimestamp();
+      if (expiryTimestamp != null) {
+        await Purchases.setAttributes({
+          "affiliateOfferCode": "",
+          "insert_timedout": expiryTimestamp.toString(),
+        });
+        print('[Attribution] insert_timedout=$expiryTimestamp set, affiliateOfferCode cleared');
       }
-    });
+    }
   }
 }
 ```
@@ -231,7 +267,7 @@ class _MyAppState extends State<MyApp> {
     );
 
     // Set up callback for affiliate identifier changes
-    insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
+    insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offerCode) async {
       if (identifier != null && identifier.isNotEmpty) {
         await _updateAdaptyWithAffiliateId(identifier);
       }
@@ -467,10 +503,12 @@ void main() async {
   );
 
   // Set up callback for affiliate identifier changes
-  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
+  insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offerCode) async {
     if (identifier != null) {
       // For RevenueCat:
-      // await Purchases.setAttributes({"insert_affiliate": identifier});
+      // var attrs = {"insert_affiliate": identifier, "insert_timedout": ""};
+      // if (offerCode != null) attrs["affiliateOfferCode"] = offerCode;
+      // await Purchases.setAttributes(attrs);
       // await Purchases.syncAttributesAndOfferingsIfNeeded();
 
       // For Adapty:
@@ -756,19 +794,62 @@ final identifier = await insertAffiliateSdk.returnInsertAffiliateIdentifier(igno
 <details>
 <summary><h3>Affiliate Change Callback</h3></summary>
 
-Get notified when the affiliate identifier changes:
+Get notified when the affiliate identifier changes. The callback now includes both the identifier and the offer code:
 
 ```dart
-insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier) async {
+insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offerCode) async {
   if (identifier != null) {
-    print('Affiliate changed: $identifier');
+    print('Affiliate changed: $identifier, offer code: $offerCode');
 
-    // Update your IAP platform
-    await Purchases.setAttributes({"insert_affiliate": identifier});
+    // Update your IAP platform with both identifier and offer code
+    var attributes = {"insert_affiliate": identifier, "insert_timedout": ""};
+    if (offerCode != null) {
+      attributes["affiliateOfferCode"] = offerCode;
+    }
+    await Purchases.setAttributes(attributes);
     await Purchases.syncAttributesAndOfferingsIfNeeded();
   }
 });
 ```
+
+</details>
+
+<details>
+<summary><h3>Prevent Affiliate Transfer</h3></summary>
+
+Protect the original affiliate from being overwritten by subsequent affiliate links:
+
+```dart
+insertAffiliateSdk = InsertAffiliateFlutterSDK(
+  companyCode: "YOUR_COMPANY_CODE",
+  preventAffiliateTransfer: true,  // Protect original affiliate
+);
+```
+
+When enabled, if a user already has an affiliate identifier stored, any new affiliate links will be blocked. This ensures the original affiliate who referred the user gets credit for any future purchases.
+
+</details>
+
+<details>
+<summary><h3>Get Affiliate Expiry Timestamp</h3></summary>
+
+Get the Unix timestamp (in milliseconds) when the current affiliate attribution expires:
+
+```dart
+final expiryTimestamp = await insertAffiliateSdk.getAffiliateExpiryTimestamp();
+
+if (expiryTimestamp != null) {
+  final expiryDate = DateTime.fromMillisecondsSinceEpoch(expiryTimestamp);
+  print('Attribution expires at: $expiryDate');
+
+  // Check if expired
+  if (DateTime.now().millisecondsSinceEpoch > expiryTimestamp) {
+    print('Attribution has expired');
+  }
+}
+```
+
+Returns `null` if no attribution date is stored or if timeout is disabled.
 
 </details>
 

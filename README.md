@@ -156,10 +156,13 @@ class _MyAppState extends State<MyApp> {
       // Ensure subscriber exists by fetching customer info first
       await Purchases.getCustomerInfo();
 
+      // Get expiry timestamp for insert_timedout
+      final expiryTimestamp = await insertAffiliateSdk.getAffiliateExpiryTimestamp();
+
       // Set RevenueCat attributes
       var attributes = {
         "insert_affiliate": identifier,
-        "insert_timedout": "",  // Clear timeout flag on new attribution
+        "insert_timedout": expiryTimestamp?.toString() ?? "",  // Expiry timestamp
       };
       if (offerCode != null) {
         attributes["affiliateOfferCode"] = offerCode;
@@ -172,27 +175,14 @@ class _MyAppState extends State<MyApp> {
       await Purchases.syncAttributesAndOfferingsIfNeeded();
     });
 
-    // Check for existing affiliate identifier
+    // Check for existing affiliate identifier on app launch
     final existingId = await insertAffiliateSdk.returnInsertAffiliateIdentifier();
     if (existingId != null) {
-      await Purchases.setAttributes({"insert_affiliate": existingId});
-    }
-
-    // Check if attribution has expired and set insert_timedout if so
-    await _checkAndClearExpiredAttribution();
-  }
-
-  Future<void> _checkAndClearExpiredAttribution() async {
-    final isValid = await insertAffiliateSdk.isAffiliateAttributionValid();
-    if (!isValid) {
       final expiryTimestamp = await insertAffiliateSdk.getAffiliateExpiryTimestamp();
-      if (expiryTimestamp != null) {
-        await Purchases.setAttributes({
-          "affiliateOfferCode": "",
-          "insert_timedout": expiryTimestamp.toString(),
-        });
-        print('[Attribution] insert_timedout=$expiryTimestamp set, affiliateOfferCode cleared');
-      }
+      await Purchases.setAttributes({
+        "insert_affiliate": existingId,
+        "insert_timedout": expiryTimestamp?.toString() ?? "",
+      });
     }
   }
 }

@@ -725,21 +725,39 @@ Learn more: [Short Codes Documentation](https://docs.insertaffiliate.com/short-c
 Automatically apply discounts or trials when users come from specific affiliates.
 
 **How It Works:**
-1. Configure an offer code modifier in your dashboard (e.g., `_oneWeekFree`)
+1. Configure an offer code modifier in your dashboard (e.g., `oneWeekFree`)
 2. SDK automatically fetches and stores the modifier when affiliate identifier is set
-3. Use the modifier to construct dynamic product IDs
+3. The `affiliateOfferCode` attribute is set in RevenueCat for targeting
 
-**Quick Example:**
+#### Option 1: RevenueCat Targeting (Recommended)
+
+Use RevenueCat's targeting feature to automatically show different offerings based on the `affiliateOfferCode` attribute. No manual product ID construction needed.
+
+**Step 1:** Create offerings in RevenueCat (e.g., `default` and `oneWeekFree`)
+
+**Step 2:** Configure targeting rules in RevenueCat:
+- Condition: `affiliateOfferCode` is any of `oneWeekFree`
+- Show Offering: Select your promotional offering
+
+**Step 3:** Just use `offerings.current` in your app:
+
+```dart
+final offerings = await Purchases.getOfferings();
+final packages = offerings.current?.availablePackages ?? [];
+// RevenueCat targeting automatically shows the right offering!
+```
+
+#### Option 2: Manual Product ID Construction (Alternative)
+
+If not using RevenueCat targeting, you can manually construct product IDs:
 
 ```dart
 String? offerCode = await insertAffiliateSdk.getStoredOfferCode();
 
 final baseProductId = "oneMonthSubscription";
 final dynamicProductId = offerCode != null
-    ? '$baseProductId$offerCode'  // e.g., "oneMonthSubscription_oneWeekFree"
+    ? '${baseProductId}_$offerCode'  // e.g., "oneMonthSubscription_oneWeekFree"
     : baseProductId;
-
-// Use dynamicProductId when fetching/purchasing products
 ```
 
 📖 **[View complete Dynamic Offer Codes guide →](docs/dynamic-offer-codes.md)**

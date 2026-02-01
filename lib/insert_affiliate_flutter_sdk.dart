@@ -12,7 +12,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_play_install_referrer/android_play_install_referrer.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier);
+typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier, String? offerCode);
 
 /// Source types for affiliate association tracking
 enum AffiliateAssociationSource {
@@ -40,10 +40,11 @@ class AffiliateDetails {
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
   bool _verboseLogging = false;
-  
+
   bool _insertLinksEnabled = false;
   bool _insertLinksClipboardEnabled = false;
   int _attributionTimeout = 0;
+  bool _preventAffiliateTransfer = false;
   InsertAffiliateIdentifierChangeCallback? _insertAffiliateIdentifierChangeCallback;
   
   static const String _referrerLinkKey = 'referring_link';
@@ -54,10 +55,12 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     bool insertLinksEnabled = false,
     bool insertLinksClipboardEnabled = false,
     int attributionTimeout = 0,
+    bool preventAffiliateTransfer = false,
   }) : _verboseLogging = verboseLogging,
        _insertLinksEnabled = insertLinksEnabled,
        _insertLinksClipboardEnabled = insertLinksClipboardEnabled,
-       _attributionTimeout = attributionTimeout {
+       _attributionTimeout = attributionTimeout,
+       _preventAffiliateTransfer = preventAffiliateTransfer {
     _init();
   }
 
@@ -69,6 +72,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       print('[Insert Affiliate] [VERBOSE] Insert links enabled: $_insertLinksEnabled');
       print('[Insert Affiliate] [VERBOSE] Clipboard enabled: $_insertLinksClipboardEnabled');
       print('[Insert Affiliate] [VERBOSE] Attribution timeout: $_attributionTimeout');
+      print('[Insert Affiliate] [VERBOSE] Prevent affiliate transfer: $_preventAffiliateTransfer');
     }
     
     // Set the attribution timeout in SharedPreferences if provided
@@ -517,6 +521,37 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
+  /// Returns the Unix timestamp (in milliseconds) when the current affiliate attribution expires.
+  /// Returns null if no attribution date is stored or if timeout is disabled (0).
+  Future<int?> getAffiliateExpiryTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get the stored attribution date
+      final storedDateString = prefs.getString('affiliate_attribution_date');
+      if (storedDateString == null) {
+        verboseLog('No attribution date found, cannot calculate expiry timestamp');
+        return null;
+      }
+
+      // Get the timeout period (default to 0 = disabled if not set)
+      final timeoutSeconds = prefs.getInt('affiliate_attribution_timeout_seconds') ?? 0;
+      if (timeoutSeconds <= 0) {
+        verboseLog('Attribution timeout disabled, no expiry timestamp');
+        return null;
+      }
+
+      final storedDate = DateTime.parse(storedDateString);
+      final expiryTimestamp = storedDate.millisecondsSinceEpoch + (timeoutSeconds * 1000);
+
+      verboseLog('Affiliate expiry timestamp: $expiryTimestamp (stored: ${storedDate.toIso8601String()}, timeout: ${timeoutSeconds}s)');
+      return expiryTimestamp;
+    } catch (error) {
+      verboseLog('Error getting affiliate expiry timestamp: $error');
+      return null;
+    }
+  }
+
   Future<void> storeExpectedStoreTransaction(String purchaseToken) async {
     try {
       verboseLog('Storing expected store transaction with token: $purchaseToken');
@@ -747,34 +782,37 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
-  Future<void> retrieveAndStoreOfferCode(String affiliateLink) async {
+  Future<String?> retrieveAndStoreOfferCode(String affiliateLink) async {
     try {
       verboseLog('Attempting to retrieve and store offer code for: $affiliateLink');
-      
+
       final offerCode = await fetchOfferCode(affiliateLink);
-      
+
       if (offerCode != null && offerCode.isNotEmpty) {
         // Store in SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('offer_code', offerCode);
-        
+
         // Notify listeners of the change
         notifyListeners();
-        
+
         verboseLog('Successfully stored offer code: $offerCode');
         print('[Insert Affiliate] Offer code retrieved and stored successfully');
+        return offerCode;
       } else {
         verboseLog('No valid offer code found to store');
         // Clear stored offer code if none found
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('offer_code', '');
-        
+
         // Notify listeners of the change
         notifyListeners();
+        return null;
       }
     } catch (error) {
       errorLog("Error retrieving and storing offer code: $error", "error");
       verboseLog('Error in retrieveAndStoreOfferCode: $error');
+      return null;
     }
   }
 
@@ -1352,6 +1390,13 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       return;
     }
 
+    // Check if transfer prevention is enabled and an existing affiliate is present
+    if (_preventAffiliateTransfer && existingLink != null && existingLink.isNotEmpty) {
+      verboseLog('Transfer blocked: existing affiliate "$existingLink" protected from being replaced by "$link"');
+      print('[Insert Affiliate] Transfer blocked: existing affiliate "$existingLink" protected from being replaced by "$link"');
+      return;
+    }
+
     await prefs.setString(_referrerLinkKey, link);
 
     // Store the attribution date for new affiliate identifier
@@ -1363,13 +1408,13 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
 
     // Automatically fetch and store offer code
     verboseLog('Attempting to fetch offer code for stored affiliate identifier...');
-    await retrieveAndStoreOfferCode(link);
+    final offerCode = await retrieveAndStoreOfferCode(link);
 
-    // Trigger callback with the current affiliate identifier
+    // Trigger callback with both the current affiliate identifier and offer code
     if (_insertAffiliateIdentifierChangeCallback != null) {
       final currentIdentifier = await returnInsertAffiliateIdentifier(ignoreTimeout: true);
-      verboseLog('Triggering callback with identifier: $currentIdentifier');
-      _insertAffiliateIdentifierChangeCallback!(currentIdentifier);
+      verboseLog('Triggering callback with identifier: $currentIdentifier, offerCode: $offerCode');
+      _insertAffiliateIdentifierChangeCallback!(currentIdentifier, offerCode);
     }
 
     // Report this new affiliate association to the backend (fire and forget)

@@ -827,8 +827,7 @@ insertAffiliateSdk.setInsertAffiliateIdentifierChangeCallback((identifier, offer
 
 </details>
 
-<details>
-<summary><h3>Prevent Affiliate Transfer</h3></summary>
+### Prevent Affiliate Transfer
 
 Protect the original affiliate from being overwritten by subsequent affiliate links:
 
@@ -841,7 +840,7 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
 
 When enabled, if a user already has an affiliate identifier stored, any new affiliate links will be blocked. This ensures the original affiliate who referred the user gets credit for any future purchases.
 
-</details>
+Learn more: [Prevent Affiliate Transfer Documentation](https://docs.insertaffiliate.com/prevent-affiliate-transfer)
 
 <details>
 <summary><h3>Get Affiliate Expiry Timestamp</h3></summary>

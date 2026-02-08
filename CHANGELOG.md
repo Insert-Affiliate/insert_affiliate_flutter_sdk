@@ -1,3 +1,6 @@
+## 1.7.0
+Add short code usage tracking
+
 ## 1.4.0
 Adapty integration
 

@@ -243,7 +243,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
 
     // Validate that the short code exists in the system
-    final affiliateDetails = await getAffiliateDetails(shortCode);
+    final affiliateDetails = await getAffiliateDetails(shortCode, trackUsage: true);
     if (affiliateDetails == null) {
       print('[Insert Affiliate] Error: Short code \'$shortCode\' does not exist or validation failed.');
       return false;
@@ -261,7 +261,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   /// Retrieves detailed information about an affiliate by their short code or deep link
   /// This method queries the API and does not store or set the affiliate identifier
   /// Returns AffiliateDetails if found, null otherwise
-  Future<AffiliateDetails?> getAffiliateDetails(String affiliateCode) async {
+  Future<AffiliateDetails?> getAffiliateDetails(String affiliateCode, {bool trackUsage = false}) async {
     if (companyCode.isEmpty) {
       print('[Insert Affiliate] Company code is not set. Please initialize the SDK with a valid company code.');
       return null;
@@ -273,10 +273,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     const urlString = 'https://api.insertaffiliate.com/V1/checkAffiliateExists';
 
     try {
-      final payload = {
+      final payload = <String, dynamic>{
         'companyId': companyCode,
         'affiliateCode': cleanCode,
       };
+
+      if (trackUsage) {
+        payload['trackUsage'] = true;
+      }
 
       verboseLog('Checking if affiliate exists: $cleanCode');
 

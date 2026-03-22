@@ -954,13 +954,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     // Store the short code as the referring link
     await storeInsertAffiliateIdentifier(link: upperCaseShortCode, source: AffiliateAssociationSource.deepLinkIos);
 
-    // Collect and send enhanced system info to backend
-    try {
-      final enhancedSystemInfo = await getEnhancedSystemInfo();
-      await sendSystemInfoToBackend(enhancedSystemInfo);
-    } catch (error) {
-      verboseLog('Error sending system info for deep link: $error');
-    }
+    // System info not needed here - affiliate code already received via URL scheme
 
     return true;
   }

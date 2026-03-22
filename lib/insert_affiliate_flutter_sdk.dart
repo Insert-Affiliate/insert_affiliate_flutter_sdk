@@ -90,11 +90,15 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
       
       if (Platform.isIOS) {
-        try {
-          final enhancedSystemInfo = await getEnhancedSystemInfo();
-          await sendSystemInfoToBackend(enhancedSystemInfo);
-        } catch (error) {
-          verboseLog('Error sending system info for clipboard check: $error');
+        final prefs = await SharedPreferences.getInstance();
+        final systemInfoSent = prefs.getBool('system_info_sent') ?? false;
+        if (!systemInfoSent) {
+          try {
+            final enhancedSystemInfo = await getEnhancedSystemInfo();
+            await sendSystemInfoToBackend(enhancedSystemInfo);
+          } catch (error) {
+            verboseLog('Error sending system info for clipboard check: $error');
+          }
         }
       }
     }
@@ -950,13 +954,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     // Store the short code as the referring link
     await storeInsertAffiliateIdentifier(link: upperCaseShortCode, source: AffiliateAssociationSource.deepLinkIos);
 
-    // Collect and send enhanced system info to backend
-    try {
-      final enhancedSystemInfo = await getEnhancedSystemInfo();
-      await sendSystemInfoToBackend(enhancedSystemInfo);
-    } catch (error) {
-      verboseLog('Error sending system info for deep link: $error');
-    }
+    // System info not needed here - affiliate code already received via URL scheme
 
     return true;
   }
@@ -1363,6 +1361,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
 
       if (response.statusCode >= 200 && response.statusCode <= 299) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('system_info_sent', true);
         verboseLog('System info sent successfully');
       } else {
         verboseLog('Failed to send system info with status code: ${response.statusCode}');

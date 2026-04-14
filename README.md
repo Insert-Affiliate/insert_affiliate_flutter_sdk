@@ -538,6 +538,43 @@ void _setupDeepLinkListener() async {
 }
 ```
 
+#### Universal Links (Optional, Recommended)
+
+Universal Links provide a better user experience than custom URL schemes. When a user taps an Insert Link and already has your app installed, iOS opens the app directly — without loading the browser.
+
+**Prerequisites:**
+- Enter your **Apple Team ID** and **iOS Bundle Identifier** in the Insert Affiliate dashboard settings
+
+**Step 1: Add Associated Domains in Xcode**
+
+Go to your app target → **Signing & Capabilities** → **+ Capability** → **Associated Domains**.
+
+Add:
+```
+applinks:insertaffiliate.link
+```
+
+If you have a custom domain (e.g. `links.yourcompany.com`), also add:
+```
+applinks:links.yourcompany.com
+```
+
+**Step 2: Handle Universal Links in your app**
+
+The `app_links` package used above already handles Universal Links — both `getInitialLink()` and `uriLinkStream` receive Universal Link URLs. The SDK's `handleDeepLink()` method routes them to the correct handler automatically. No additional code changes needed.
+
+> **Note:** Universal Links won't trigger if you type the URL directly into Safari's address bar — tap it from **Notes or Messages** for a real test.
+
+**Testing Universal Links:**
+
+```bash
+# iOS Simulator
+xcrun simctl openurl booted "https://insertaffiliate.link/YOUR_COMPANY_CODE/TEST_SHORT_CODE"
+
+# Real device (get UDID from: xcrun devicectl list devices)
+xcrun devicectl device process launch -d YOUR_DEVICE_UDID com.apple.mobilesafari "https://insertaffiliate.link/YOUR_COMPANY_CODE/TEST_SHORT_CODE"
+```
+
 ✅ **Insert Links setup complete!**
 
 </details>

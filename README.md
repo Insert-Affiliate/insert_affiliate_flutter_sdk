@@ -559,7 +559,16 @@ If you have a custom domain (e.g. `links.yourcompany.com`), also add:
 applinks:links.yourcompany.com
 ```
 
-**Step 2: Handle Universal Links in your app**
+**Step 2: Disable Flutter's built-in deep link handling**
+
+Add this to your `ios/Runner/Info.plist` to prevent Flutter's engine from trying to route Universal Link URLs (which causes Safari to open after the SDK handles the link):
+
+```xml
+<key>FlutterDeepLinkingEnabled</key>
+<false/>
+```
+
+**Step 3: Handle Universal Links in your app**
 
 The `app_links` package used above already handles Universal Links — both `getInitialLink()` and `uriLinkStream` receive Universal Link URLs. The SDK's `handleDeepLink()` method routes them to the correct handler automatically. No additional code changes needed.
 

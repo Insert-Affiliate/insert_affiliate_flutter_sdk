@@ -538,6 +538,87 @@ void _setupDeepLinkListener() async {
 }
 ```
 
+#### Universal Links (Optional, Recommended)
+
+Universal Links provide a better user experience than custom URL schemes. When a user taps an Insert Link and already has your app installed, iOS opens the app directly — without loading the browser.
+
+**Prerequisites:**
+- Enter your **Apple Team ID** and **iOS Bundle Identifier** in the Insert Affiliate dashboard settings
+
+**Step 1: Add Associated Domains in Xcode**
+
+Go to your app target → **Signing & Capabilities** → **+ Capability** → **Associated Domains**.
+
+Add:
+```
+applinks:insertaffiliate.link
+```
+
+If you have a custom domain (e.g. `links.yourcompany.com`), also add:
+```
+applinks:links.yourcompany.com
+```
+
+**Step 2: Disable Flutter's built-in deep link handling**
+
+Add this to your `ios/Runner/Info.plist` to prevent Flutter's engine from trying to route Universal Link URLs (which causes Safari to open after the SDK handles the link):
+
+```xml
+<key>FlutterDeepLinkingEnabled</key>
+<false/>
+```
+
+**Step 3: Handle Universal Links in your app**
+
+The `app_links` package used above already handles Universal Links — both `getInitialLink()` and `uriLinkStream` receive Universal Link URLs. The SDK's `handleDeepLink()` method routes them to the correct handler automatically. No additional code changes needed.
+
+> **Note:** Universal Links won't trigger if you type the URL directly into Safari's address bar — tap it from **Notes or Messages** for a real test.
+
+**Testing Universal Links:**
+
+```bash
+# iOS Simulator
+xcrun simctl openurl booted "https://insertaffiliate.link/YOUR_COMPANY_CODE/TEST_SHORT_CODE"
+
+# Real device (get UDID from: xcrun devicectl list devices)
+xcrun devicectl device process launch -d YOUR_DEVICE_UDID com.apple.mobilesafari "https://insertaffiliate.link/YOUR_COMPANY_CODE/TEST_SHORT_CODE"
+```
+
+#### Android App Links (Optional, Recommended)
+
+Android App Links provide a better user experience than custom URL schemes. When a user taps an Insert Link and already has your app installed, Android opens the app directly — without loading the browser or showing a disambiguation dialog.
+
+**Prerequisites:**
+- Enter your **Android Bundle Identifier** (package name) and **SHA-256 Certificate Fingerprints** in the Insert Affiliate dashboard settings
+
+**Step 1: Add intent filter to AndroidManifest.xml**
+
+Add this inside your main `<activity>` tag in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<intent-filter android:autoVerify="true">
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="https" android:host="insertaffiliate.link" />
+</intent-filter>
+```
+
+If you have a custom domain, add another intent filter with your domain.
+
+**Step 2: Set launch mode**
+
+Add `android:launchMode="singleTop"` to your main activity to prevent it being recreated when an App Link is tapped:
+
+```xml
+<activity
+    android:name=".MainActivity"
+    android:launchMode="singleTop"
+    ...>
+```
+
+> No additional code changes needed — the `app_links` package already receives App Link URLs and the SDK routes them to the correct handler automatically.
+
 ✅ **Insert Links setup complete!**
 
 </details>

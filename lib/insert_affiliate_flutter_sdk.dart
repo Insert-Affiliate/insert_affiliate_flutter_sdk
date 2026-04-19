@@ -22,6 +22,8 @@ enum AffiliateAssociationSource {
   clipboardMatch,    // iOS clipboard UUID match from backend
   shortCodeManual,   // Developer called setShortCode()
   referringLink,     // Developer called setInsertAffiliateIdentifier()
+  universalLink,     // iOS Universal Link (https://insertaffiliate.link/companycode/shortcode)
+  appLink,           // Android App Link (https://insertaffiliate.link/companycode/shortcode)
 }
 
 /// Affiliate details returned from the API
@@ -218,6 +220,10 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         return 'short_code_manual';
       case AffiliateAssociationSource.referringLink:
         return 'referring_link';
+      case AffiliateAssociationSource.universalLink:
+        return 'universal_link';
+      case AffiliateAssociationSource.appLink:
+        return 'app_link';
     }
   }
 
@@ -849,6 +855,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Platform Routing
   Future<bool> handleDeepLink(String url) async {
     verboseLog('Platform detection: Platform.OS = ${Platform.operatingSystem}');
+
+    // App Links (Android) and Universal Links (iOS) both use https://
+    // Route these through handleInsertLinks which handles both
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      verboseLog('Routing https URL to handleInsertLinks');
+      return await handleInsertLinks(url);
+    }
+
     if (Platform.isIOS) {
       verboseLog('Routing to iOS handler (handleInsertLinks)');
       return await handleInsertLinks(url);
@@ -879,7 +893,17 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       return await handleCustomURLScheme(url, urlObj['protocol']!);
     }
 
-    // Universal links handling would go here for future implementation
+    // Handle universal links from insertaffiliate.link
+    if (urlObj['protocol'] == 'https:' && (urlObj['hostname']?.contains('insertaffiliate.link') == true)) {
+      return await handleUniversalLink(url);
+    }
+
+    // Handle universal links from any https domain (custom domains)
+    // iOS only delivers universal links for domains in Associated Domains entitlement
+    if (urlObj['protocol'] == 'https:') {
+      return await handleCustomDomainUniversalLink(url);
+    }
+
     return false;
   }
 
@@ -898,6 +922,76 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         'hostname': '',
         'href': url,
       };
+    }
+  }
+
+  // MARK: Universal Link Handler
+  /// Handle universal links like https://insertaffiliate.link/companycode/shortcode
+  /// Also supports legacy format: https://insertaffiliate.link/V1/companycode/shortcode
+  Future<bool> handleUniversalLink(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final pathComponents = uri.pathSegments;
+
+      String urlCompanyCode;
+      String shortCode;
+
+      if (pathComponents.length >= 3 && pathComponents[0] == 'V1') {
+        // Legacy format: /V1/companycode/shortcode
+        urlCompanyCode = pathComponents[1];
+        shortCode = pathComponents[2];
+      } else if (pathComponents.length >= 2) {
+        // Current format: /companycode/shortcode
+        urlCompanyCode = pathComponents[0];
+        shortCode = pathComponents[1];
+      } else {
+        print('[Insert Affiliate] Invalid universal link format: $url');
+        return false;
+      }
+
+      verboseLog('Universal link detected - Company: $urlCompanyCode, Short code: $shortCode');
+
+      final activeCompanyCode = await getActiveCompanyCode();
+      if (activeCompanyCode != null && urlCompanyCode.toLowerCase() != activeCompanyCode.toLowerCase()) {
+        verboseLog('Warning: URL company code ($urlCompanyCode) doesn\'t match initialized company code ($activeCompanyCode)');
+      }
+
+      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
+      return true;
+    } catch (error) {
+      print('[Insert Affiliate] Error handling universal link: $error');
+      return false;
+    }
+  }
+
+  /// Handle universal links from custom domains (e.g. https://links.yourcompany.com/companycode/shortcode)
+  /// iOS only delivers universal links for domains in the app's Associated Domains entitlement
+  Future<bool> handleCustomDomainUniversalLink(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final pathComponents = uri.pathSegments;
+
+      if (pathComponents.length < 2) {
+        return false;
+      }
+
+      final urlCompanyCode = pathComponents[0];
+      final shortCode = pathComponents[1];
+
+      final activeCompanyCode = await getActiveCompanyCode();
+      if (activeCompanyCode == null) return false;
+
+      if (urlCompanyCode.toLowerCase() != activeCompanyCode.toLowerCase()) {
+        verboseLog('Custom domain universal link company code ($urlCompanyCode) doesn\'t match initialized company code ($activeCompanyCode), ignoring');
+        return false;
+      }
+
+      verboseLog('Custom domain universal link detected - Short code: $shortCode');
+      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
+      return true;
+    } catch (error) {
+      print('[Insert Affiliate] Error handling custom domain universal link: $error');
+      return false;
     }
   }
 

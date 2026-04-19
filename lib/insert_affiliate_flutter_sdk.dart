@@ -23,6 +23,7 @@ enum AffiliateAssociationSource {
   shortCodeManual,   // Developer called setShortCode()
   referringLink,     // Developer called setInsertAffiliateIdentifier()
   universalLink,     // iOS Universal Link (https://insertaffiliate.link/companycode/shortcode)
+  appLink,           // Android App Link (https://insertaffiliate.link/companycode/shortcode)
 }
 
 /// Affiliate details returned from the API
@@ -221,6 +222,8 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         return 'referring_link';
       case AffiliateAssociationSource.universalLink:
         return 'universal_link';
+      case AffiliateAssociationSource.appLink:
+        return 'app_link';
     }
   }
 
@@ -852,6 +855,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Platform Routing
   Future<bool> handleDeepLink(String url) async {
     verboseLog('Platform detection: Platform.OS = ${Platform.operatingSystem}');
+
+    // App Links (Android) and Universal Links (iOS) both use https://
+    // Route these through handleInsertLinks which handles both
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      verboseLog('Routing https URL to handleInsertLinks');
+      return await handleInsertLinks(url);
+    }
+
     if (Platform.isIOS) {
       verboseLog('Routing to iOS handler (handleInsertLinks)');
       return await handleInsertLinks(url);
@@ -945,7 +956,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         verboseLog('Warning: URL company code ($urlCompanyCode) doesn\'t match initialized company code ($activeCompanyCode)');
       }
 
-      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: AffiliateAssociationSource.universalLink);
+      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
       return true;
     } catch (error) {
       print('[Insert Affiliate] Error handling universal link: $error');
@@ -976,7 +987,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
 
       verboseLog('Custom domain universal link detected - Short code: $shortCode');
-      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: AffiliateAssociationSource.universalLink);
+      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
       return true;
     } catch (error) {
       print('[Insert Affiliate] Error handling custom domain universal link: $error');

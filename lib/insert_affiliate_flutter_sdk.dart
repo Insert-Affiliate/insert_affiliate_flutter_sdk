@@ -11,6 +11,20 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_play_install_referrer/android_play_install_referrer.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
+import 'src/models/affiliate_details.dart';
+import 'src/referrals.dart';
+import 'src/refer_a_friend_screen.dart';
+
+export 'src/models/affiliate_details.dart';
+export 'src/referrals.dart'
+    show
+        AffiliateEnrolmentStatus,
+        AffiliateEnrolmentResult,
+        MyAffiliateDetails,
+        ReferralProgramConfig,
+        buildReferralShareText;
+export 'src/refer_a_friend_screen.dart' show ReferAFriendScreen, ReferAFriendOptions;
 
 typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier, String? offerCode);
 
@@ -26,19 +40,6 @@ enum AffiliateAssociationSource {
   appLink,           // Android App Link (https://insertaffiliate.link/companycode/shortcode)
 }
 
-/// Affiliate details returned from the API
-class AffiliateDetails {
-  final String affiliateName;
-  final String affiliateShortCode;
-  final String deeplinkUrl;
-
-  AffiliateDetails({
-    required this.affiliateName,
-    required this.affiliateShortCode,
-    required this.deeplinkUrl,
-  });
-}
-
 class InsertAffiliateFlutterSDK extends ChangeNotifier {
   final String companyCode;
   bool _verboseLogging = false;
@@ -50,6 +51,9 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   InsertAffiliateIdentifierChangeCallback? _insertAffiliateIdentifierChangeCallback;
   
   static const String _referrerLinkKey = 'referring_link';
+
+  late final InsertAffiliateReferrals _referrals =
+      InsertAffiliateReferrals(companyCode: companyCode, verboseLog: verboseLog);
 
   InsertAffiliateFlutterSDK({
     required this.companyCode,
@@ -849,6 +853,101 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   // MARK: Callback Management
   void setInsertAffiliateIdentifierChangeCallback(InsertAffiliateIdentifierChangeCallback? callback) {
     _insertAffiliateIdentifierChangeCallback = callback;
+  }
+
+
+  // MARK: In-App Referrals
+  /// Makes the app's user a referrer (an affiliate of this app) and connects
+  /// this device. Returns [AffiliateEnrolmentStatus.created] for a new
+  /// affiliate, or [AffiliateEnrolmentStatus.verificationRequired] when the
+  /// email is already an affiliate: a 6-digit code was emailed, pass it to
+  /// [verifyAffiliateCode].
+  Future<AffiliateEnrolmentResult> createAffiliateForUser(String email, String name) async {
+    verboseLog('Creating in-app referrer');
+    final result = await _referrals.enrol(email, name);
+    _logReferralResult('createAffiliateForUser', result);
+    return result;
+  }
+
+  /// Finishes connecting with the code emailed after
+  /// [AffiliateEnrolmentStatus.verificationRequired].
+  Future<AffiliateEnrolmentResult> verifyAffiliateCode(String email, String code, {String? name}) async {
+    verboseLog('Verifying in-app referrer code');
+    final result = await _referrals.verify(email, code, name: name);
+    _logReferralResult('verifyAffiliateCode', result);
+    return result;
+  }
+
+  /// The connected referrer's details and referral stats, or null when this
+  /// device is not connected (or on a network error). Values are for display;
+  /// grant rewards of real value from your server.
+  Future<MyAffiliateDetails?> getMyAffiliateDetails() {
+    return _referrals.me();
+  }
+
+  /// True when this device holds a referrer token for this app. No network call.
+  Future<bool> isUserAnAffiliate() {
+    return _referrals.hasToken();
+  }
+
+  /// Disconnects this device from the referrer (call on app logout). The
+  /// affiliate account itself is unchanged.
+  Future<void> signOutAffiliate() async {
+    await _referrals.clearToken();
+    verboseLog('Signed out in-app referrer');
+  }
+
+  /// The referral program settings and drop-in screen copy from the portal,
+  /// or null on a network error.
+  Future<ReferralProgramConfig?> getReferralProgramConfig() {
+    return _referrals.config();
+  }
+
+  /// Opens the system share sheet with the referrer's link (or code for Short
+  /// Code Only apps). [message] may use `{link}` and `{code}` placeholders.
+  /// On iPad pass [sharePositionOrigin] to anchor the share popover.
+  /// Returns false when this device is not connected as a referrer.
+  Future<bool> shareReferralLink({String? message, Rect? sharePositionOrigin}) async {
+    final details = await getMyAffiliateDetails();
+    if (details == null) {
+      errorLog('Cannot share referral link: this user is not connected as a referrer.', 'warn');
+      return false;
+    }
+    final config = await getReferralProgramConfig();
+    final text = buildReferralShareText(
+      deeplinkUrl: details.deeplinkUrl,
+      shortCode: details.affiliateShortCode,
+      companyName: config?.companyName ?? '',
+      message: message,
+    );
+    try {
+      await SharePlus.instance.share(ShareParams(text: text, sharePositionOrigin: sharePositionOrigin));
+      return true;
+    } catch (error) {
+      errorLog('Error opening share sheet: $error', 'error');
+      return false;
+    }
+  }
+
+  /// Presents the drop-in "Refer a friend" screen as a modal bottom sheet.
+  /// Calls [ReferAFriendOptions.onClose] once it is dismissed.
+  Future<void> showReferAFriend(BuildContext context, {ReferAFriendOptions options = const ReferAFriendOptions()}) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => ReferAFriendScreen(sdk: this, options: options),
+    );
+    options.onClose?.call();
+  }
+
+  void _logReferralResult(String method, AffiliateEnrolmentResult result) {
+    if (result.status == AffiliateEnrolmentStatus.error) {
+      errorLog('$method failed: ${result.errorCode} ${result.errorMessage ?? ''}', 'warn');
+    } else {
+      verboseLog('$method result: ${result.status.name}');
+    }
   }
 
 

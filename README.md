@@ -946,6 +946,92 @@ Returns `null` if no attribution date is stored or if timeout is disabled.
 
 </details>
 
+<details>
+<summary><h3>In-App Referrals (Refer a Friend)</h3></summary>
+
+Turn your own users into affiliates from inside your app. Each referrer is a normal Insert Affiliate affiliate (same dashboard, commission and payouts), and your app can read how many referrals they have made to reward them.
+
+Switch the program on in the Insert Affiliate dashboard first. Enrolment is refused while it is off.
+
+**Drop-in screen:**
+
+```dart
+await insertAffiliateSdk.showReferAFriend(
+  context,
+  options: ReferAFriendOptions(
+    email: currentUser.email, // prefill with your logged-in user
+    name: currentUser.name,
+    shareMessage: 'Get a free week of MyApp: {link}', // optional, supports {link} and {code}
+    primaryColor: Colors.teal,  // optional, overrides the dashboard colour
+    headline: 'Invite friends', // optional, overrides the dashboard copy
+    rewardText: 'Earn a free week for every friend who subscribes.',
+    onClose: () => refreshRewards(),
+  ),
+);
+```
+
+The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
+
+Headline, reward text and colour come from your options first, then your dashboard settings, then the defaults ("Refer a friend", `#6A0DAD`), so you can change the wording without an app release. `fontFamily` and `cornerRadius` are also available.
+
+**Headless methods (build your own UI):**
+
+```dart
+// Make the user a referrer
+final result = await insertAffiliateSdk.createAffiliateForUser('jane@example.com', 'Jane');
+
+switch (result.status) {
+  case AffiliateEnrolmentStatus.created:
+    print('Share this: ${result.affiliate?.deeplinkUrl}');
+    break;
+  case AffiliateEnrolmentStatus.verificationRequired:
+    // The email is already an affiliate. We emailed them a 6-digit code.
+    final verified = await insertAffiliateSdk.verifyAffiliateCode('jane@example.com', codeFromUser);
+    break;
+  case AffiliateEnrolmentStatus.error:
+    print('${result.errorCode}: ${result.errorMessage}');
+    break;
+  default:
+    break;
+}
+
+// Referral stats (null when this device is not connected)
+final me = await insertAffiliateSdk.getMyAffiliateDetails();
+if (me != null) {
+  print('${me.referralCount} referrals, earned ${me.totalEarned} ${me.currency}');
+}
+
+final isReferrer = await insertAffiliateSdk.isUserAnAffiliate(); // local check, no network
+final config = await insertAffiliateSdk.getReferralProgramConfig(); // dashboard settings
+await insertAffiliateSdk.shareReferralLink(message: 'Join me on MyApp: {link}'); // system share sheet
+await insertAffiliateSdk.signOutAffiliate(); // call when your user logs out
+```
+
+| Method | Returns |
+|---|---|
+| `createAffiliateForUser(email, name)` | `AffiliateEnrolmentResult` with status `created`, `verificationRequired` or `error` |
+| `verifyAffiliateCode(email, code, {name})` | `AffiliateEnrolmentResult` with status `connected`, `created` or `error` |
+| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl` |
+| `isUserAnAffiliate()` | `bool` |
+| `signOutAffiliate()` | clears this device's referrer connection |
+| `getReferralProgramConfig()` | `ReferralProgramConfig?`: `enabled`, `companyName`, `referralTrigger`, `headline`, `rewardText`, `primaryColor` |
+| `shareReferralLink({message, sharePositionOrigin})` | `bool`, false when not connected |
+| `showReferAFriend(context, {options})` | shows the drop-in screen |
+
+Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `INVALID_CODE`, `TOO_MANY_CODES`, `RATE_LIMITED`, `NETWORK_ERROR`.
+
+`referralCount` is the count for what your dashboard counts as a referral (install, a tracked event, or a purchase). It only goes up, so you can compare it with what you have already rewarded and grant the difference.
+
+**How the device stays connected:** enrolling stores a private token for your company code in the SDK's app storage (the token is never logged). If the app is deleted, or the user moves to a new phone, calling `createAffiliateForUser` again with the same email sends them a code to reconnect. Their affiliate account and earnings are untouched.
+
+**Rewarding referrers:** values on the device are for display. A modified device can fake them, so grant anything of real value (credits, premium time) from your server using the `referral.created` webhook or the Public API. For free premium time, use Apple/Google offer codes or RevenueCat promotional entitlements.
+
+**Store rules:** the SDK uses the system share sheet only and never reads Contacts. Never gate app features behind sharing, and never reward ratings or reviews.
+
+This feature adds the [`share_plus`](https://pub.dev/packages/share_plus) dependency for the system share sheet.
+
+</details>
+
 ---
 
 ## 🔍 Troubleshooting

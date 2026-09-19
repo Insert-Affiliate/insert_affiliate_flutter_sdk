@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -256,7 +257,14 @@ void main() {
 
       final result = await referrals.enrol(' jane@example.com ', 'Jane');
       expect(result.status, AffiliateEnrolmentStatus.created);
-      expect(sent, {'companyId': 'company123', 'email': 'jane@example.com', 'name': 'Jane', 'platform': 'flutter'});
+      // flutter_test reports Android as the target platform by default.
+      expect(sent, {
+        'companyId': 'company123',
+        'email': 'jane@example.com',
+        'name': 'Jane',
+        'platform': 'flutter',
+        'os': 'android',
+      });
       expect(await referrals.hasToken(), isTrue);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(_tokenKey), 'tok_1');
@@ -281,6 +289,41 @@ void main() {
       expect(bodies[1]['deviceId'], 'dev123');
       expect(bodies[1].containsKey('appUserId'), isFalse);
       expect(bodies[1].containsKey('playPurchaseToken'), isFalse);
+    });
+
+    test('enrol, verify and setIdentity send os on iOS and Android only', () async {
+      final bodies = <String, Map<String, dynamic>>{};
+      final referrals = client((request) async {
+        bodies[request.url.path.split('/').last] = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(jsonEncode({'status': 'verificationRequired', 'saved': true}), 200);
+      });
+      final expected = {
+        TargetPlatform.iOS: 'ios',
+        TargetPlatform.android: 'android',
+        TargetPlatform.macOS: null,
+        TargetPlatform.windows: null,
+        TargetPlatform.linux: null,
+        TargetPlatform.fuchsia: null,
+      };
+      try {
+        for (final entry in expected.entries) {
+          debugDefaultTargetPlatformOverride = entry.key;
+          SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+          bodies.clear();
+          await referrals.enrol('jane@example.com', 'Jane');
+          await referrals.verify('jane@example.com', '123456');
+          await referrals.setIdentity(appUserId: 'rc_user_1');
+          expect(bodies.keys, unorderedEquals(['enrol', 'verify', 'identity']));
+          for (final body in bodies.values) {
+            expect(body['os'], entry.value, reason: '${entry.key}');
+            expect(body.containsKey('os'), entry.value != null, reason: '${entry.key}');
+          }
+          expect(bodies['enrol']!['platform'], 'flutter');
+          expect(bodies['verify']!['platform'], 'flutter');
+        }
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     test('enrol verificationRequired stores nothing', () async {
@@ -374,7 +417,8 @@ void main() {
           expect(request.method, 'POST');
           expect(request.url.toString(), 'https://api.insertaffiliate.com/V1/sdk/affiliate/me/identity');
           expect(request.headers['X-Insert-Affiliate-Token'], 'tok_1');
-          expect(jsonDecode(request.body), {'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok', 'deviceId': 'dev123'});
+          expect(jsonDecode(request.body),
+              {'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok', 'deviceId': 'dev123', 'os': 'android'});
           return http.Response(jsonEncode({'saved': true}), 200);
         }),
       );

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/affiliate_details.dart';
@@ -310,7 +311,22 @@ class InsertAffiliateReferrals {
 
   Future<bool> hasToken() async => (await _readToken()) != null;
 
-  /// `deviceId` (when known) plus the app supplied ids that are not empty.
+  /// The phone's OS, so the server can pick the referrer's reward store (App
+  /// Store or Google Play). Null on web and desktop.
+  static String? get _os {
+    if (kIsWeb) return null;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.android:
+        return 'android';
+      default:
+        return null;
+    }
+  }
+
+  /// `deviceId` (when known), the OS on iOS and Android, plus the app supplied
+  /// ids that are not empty.
   Future<Map<String, dynamic>> _identityFields({String? appUserId, String? playPurchaseToken}) async {
     String? deviceId;
     try {
@@ -323,6 +339,7 @@ class InsertAffiliateReferrals {
       if (playPurchaseToken != null && playPurchaseToken.trim().isNotEmpty)
         'playPurchaseToken': playPurchaseToken.trim(),
       if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+      if (_os != null) 'os': _os,
     };
   }
 

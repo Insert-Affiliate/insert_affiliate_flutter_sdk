@@ -1,3 +1,6 @@
+## Unreleased
+- In-app referrals: enrol, verify and `setReferrerAccount` send the phone's OS (`os`: `ios` or `android`) so the server can pick the referrer's reward store. Left out on web and desktop.
+
 ## 1.7.0
 Add short code usage tracking
 

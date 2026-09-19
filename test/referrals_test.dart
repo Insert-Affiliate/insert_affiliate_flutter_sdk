@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -651,6 +652,48 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Code: 123 4567');
       await tester.pump();
       expect(find.text('123456'), findsOneWidget);
+    });
+  });
+
+  group('ReferAFriendScreen copy notice', () {
+    testWidgets('shows inside the bottom sheet, above the page, then goes away', (tester) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+      // Opens the screen the way showReferAFriend does.
+      final sdk = _FakeSdk(enrolled: true);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                showDragHandle: true,
+                builder: (_) => ReferAFriendScreen(sdk: sdk),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Copy').first);
+      await tester.pump();
+      expect(copied, ['ABC123']);
+      final notice = find.descendant(of: find.byType(ReferAFriendScreen), matching: find.text('Code copied'));
+      expect(notice.hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Code copied'), findsNothing);
     });
   });
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -88,6 +89,10 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   bool _busy = false;
   bool _accountSaved = false;
 
+  // "Code copied" and similar, shown inside the screen so a bottom sheet doesn't cover it.
+  String? _notice;
+  Timer? _noticeTimer;
+
   late final TextEditingController _emailController;
   late final TextEditingController _nameController;
   final TextEditingController _codeController = TextEditingController();
@@ -109,6 +114,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     _emailController.dispose();
     _nameController.dispose();
     _codeController.dispose();
+    _noticeTimer?.cancel();
     super.dispose();
   }
 
@@ -273,7 +279,11 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   Future<void> _copy(String value, String label) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('$label copied')));
+    _noticeTimer?.cancel();
+    setState(() => _notice = '$label copied');
+    _noticeTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _notice = null);
+    });
   }
 
   Future<void> _share() async {
@@ -329,26 +339,56 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       inputDecorationTheme: InputDecorationTheme(border: OutlineInputBorder(borderRadius: radius)),
     );
 
-    return Theme(
-      data: theme,
-      child: Material(
-        color: theme.colorScheme.surface,
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _header(theme),
-                const SizedBox(height: 16),
-                ..._body(theme, radius),
-              ],
-            ),
+    final content = Material(
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _header(theme),
+              const SizedBox(height: 16),
+              ..._body(theme, radius),
+            ],
           ),
         ),
       ),
+    );
+
+    return Theme(data: theme, child: _withNotice(theme, content));
+  }
+
+  Widget _withNotice(ThemeData theme, Widget child) {
+    final notice = _notice;
+    return Stack(
+      children: [
+        child,
+        if (notice != null)
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20 + MediaQuery.of(context).padding.bottom,
+            child: Semantics(
+              liveRegion: true,
+              child: Material(
+                color: theme.colorScheme.inverseSurface,
+                elevation: 4,
+                borderRadius: BorderRadius.circular(_options.cornerRadius),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(
+                    notice,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onInverseSurface),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 

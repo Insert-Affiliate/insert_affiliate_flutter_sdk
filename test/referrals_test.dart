@@ -13,9 +13,10 @@ const _tokenKey = 'insert_affiliate_referrer_token_company123';
 
 /// Records the referral calls the drop-in screen makes.
 class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
-  _FakeSdk({this.enrolled = false});
+  _FakeSdk({this.enrolled = false, this.details = _details});
 
   final bool enrolled;
+  final MyAffiliateDetails details;
   final List<Map<String, String?>> calls = [];
 
   static const _details = MyAffiliateDetails(
@@ -38,7 +39,7 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   Future<ReferralProgramConfig?> getReferralProgramConfig() async => null;
 
   @override
-  Future<MyAffiliateDetails?> getMyAffiliateDetails() async => enrolled ? _details : null;
+  Future<MyAffiliateDetails?> getMyAffiliateDetails() async => enrolled ? details : null;
 
   @override
   Future<bool> isUserAnAffiliate() async => enrolled;
@@ -185,6 +186,23 @@ void main() {
       expect(details.rewardCodes.first.redeemUrl, contains('code=FREEWEEK2'));
       expect(details.rewardCodes.first.grantedAt, DateTime.utc(2026, 9, 18, 10));
       expect(details.rewardCodes.last.grantedAt, isNull);
+    });
+
+    test('ReferralRewardCode.fromJson reads store, defaulting to app_store', () {
+      ReferralRewardCode parse(Object? store) =>
+          ReferralRewardCode.fromJson({'code': 'C', 'redeemUrl': 'u', if (store != '<missing>') 'store': store});
+      expect(parse('app_store').store, ReferralRewardCode.appStore);
+      expect(parse('google_play').store, ReferralRewardCode.googlePlay);
+      expect(parse('google_play').isGooglePlay, isTrue);
+      expect(parse('google_play').isAppStore, isFalse);
+      for (final missing in ['<missing>', null, '', '  ', 5]) {
+        expect(parse(missing).store, ReferralRewardCode.appStore, reason: '$missing');
+        expect(parse(missing).isAppStore, isTrue);
+      }
+      final unknown = parse('amazon');
+      expect(unknown.store, 'amazon');
+      expect(unknown.isAppStore || unknown.isGooglePlay, isFalse);
+      expect(const ReferralRewardCode(code: 'C', redeemUrl: 'u').store, ReferralRewardCode.appStore);
     });
 
     test('MyAffiliateDetails.fromJson ignores bad reward values', () {
@@ -497,6 +515,89 @@ void main() {
       await tester.pumpWidget(_screen(sdk, const ReferAFriendOptions()));
       await tester.pumpAndSettle();
       expect(sdk.calls, isEmpty);
+    });
+  });
+
+  group('rewardCodesForPlatform', () {
+    final codes = [
+      const ReferralRewardCode(code: 'APPLE', redeemUrl: 'a'),
+      const ReferralRewardCode(code: 'PLAY', redeemUrl: 'https://play.google.com/redeem?code=PLAY', store: 'google_play'),
+      ReferralRewardCode.fromJson({'code': 'MISSING', 'redeemUrl': 'm'}),
+      const ReferralRewardCode(code: 'OTHER', redeemUrl: 'o', store: 'amazon'),
+    ];
+    List<String> codesFor(TargetPlatform platform, {bool isWeb = false}) =>
+        rewardCodesForPlatform(codes, platform: platform, isWeb: isWeb).map((reward) => reward.code).toList();
+
+    test('iOS lists App Store codes, including ones without a store', () {
+      expect(codesFor(TargetPlatform.iOS), ['APPLE', 'MISSING']);
+    });
+
+    test('Android lists Google Play codes only', () {
+      expect(codesFor(TargetPlatform.android), ['PLAY']);
+    });
+
+    test('web and desktop list every code', () {
+      const all = ['APPLE', 'PLAY', 'MISSING', 'OTHER'];
+      expect(codesFor(TargetPlatform.iOS, isWeb: true), all);
+      expect(codesFor(TargetPlatform.android, isWeb: true), all);
+      for (final platform in [TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux, TargetPlatform.fuchsia]) {
+        expect(codesFor(platform), all, reason: '$platform');
+      }
+    });
+
+    test('no codes stays empty', () {
+      expect(rewardCodesForPlatform(const [], platform: TargetPlatform.iOS), isEmpty);
+    });
+  });
+
+  group('ReferAFriendScreen reward codes', () {
+    const withCodes = MyAffiliateDetails(
+      affiliateName: 'Jane',
+      affiliateShortCode: 'ABC123',
+      deeplinkUrl: 'https://insertaffiliate.link/abc',
+      referralTrigger: 'purchase',
+      referralCount: 0,
+      installCount: 0,
+      eventCount: 0,
+      purchaseCount: 0,
+      totalEarned: 0,
+      totalPaid: 0,
+      totalUnpaid: 0,
+      currency: 'USD',
+      dashboardUrl: '',
+      rewardCodes: [
+        ReferralRewardCode(code: 'APPLE1', redeemUrl: 'https://apps.apple.com/redeem?code=APPLE1'),
+        ReferralRewardCode(code: 'PLAY1', redeemUrl: 'https://play.google.com/redeem?code=PLAY1', store: 'google_play'),
+      ],
+    );
+
+    Future<void> pumpOn(WidgetTester tester, TargetPlatform platform) async {
+      debugDefaultTargetPlatformOverride = platform;
+      await tester.pumpWidget(_screen(_FakeSdk(enrolled: true, details: withCodes), const ReferAFriendOptions()));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('iOS shows App Store codes only', (tester) async {
+      await pumpOn(tester, TargetPlatform.iOS);
+      expect(find.text('Your rewards'), findsOneWidget);
+      expect(find.text('APPLE1'), findsOneWidget);
+      expect(find.text('PLAY1'), findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('Android shows Google Play codes only', (tester) async {
+      await pumpOn(tester, TargetPlatform.android);
+      expect(find.text('Your rewards'), findsOneWidget);
+      expect(find.text('PLAY1'), findsOneWidget);
+      expect(find.text('APPLE1'), findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('desktop shows every code', (tester) async {
+      await pumpOn(tester, TargetPlatform.macOS);
+      expect(find.text('APPLE1'), findsOneWidget);
+      expect(find.text('PLAY1'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
     });
   });
 

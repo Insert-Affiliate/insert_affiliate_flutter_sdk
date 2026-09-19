@@ -971,7 +971,7 @@ await insertAffiliateSdk.showReferAFriend(
 );
 ```
 
-The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. When the referrer has been granted rewards it also shows "Free premium until {date}" (while that date is in the future) and, on iOS, a "Your rewards" list of App Store offer codes, each with a Redeem button. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
+The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. When the referrer has been granted rewards it also shows "Free premium until {date}" (while that date is in the future) a "Your rewards" list of the codes this phone can redeem, each with a Redeem button: App Store offer codes on iOS, Google Play promo codes on Android. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
 
 Headline, reward text and colour come from your options first, then your dashboard settings, then the defaults ("Refer a friend", `#6A0DAD`), so you can change the wording without an app release. `fontFamily` and `cornerRadius` are also available.
 
@@ -1006,7 +1006,7 @@ if (me != null) {
   print('${me.referralCount} referrals, earned ${me.totalEarned} ${me.currency}');
   print('${me.rewardsGranted} rewards, premium until ${me.premiumUntil}');
   for (final reward in me.rewardCodes) {
-    print('${reward.code}: ${reward.redeemUrl}'); // App Store offer codes, newest first
+    print('${reward.store} ${reward.code}: ${reward.redeemUrl}'); // newest first
   }
 }
 
@@ -1024,7 +1024,7 @@ await insertAffiliateSdk.signOutAffiliate(); // call when your user logs out
 | `createAffiliateForUser(email, name, {appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `created`, `verificationRequired` or `error` |
 | `verifyAffiliateCode(email, code, {name, appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `connected`, `created` or `error` |
 | `setReferrerAccount({appUserId, playPurchaseToken})` | `bool`, false when not connected or the request fails |
-| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl`, `rewardsGranted`, `premiumUntil` (`DateTime?`), `rewardCodes` (`List<ReferralRewardCode>` with `code`, `redeemUrl`, `grantedAt`) |
+| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl`, `rewardsGranted`, `premiumUntil` (`DateTime?`), `rewardCodes` (`List<ReferralRewardCode>` with `code`, `redeemUrl`, `store` (`'app_store'` or `'google_play'`), `isAppStore`, `isGooglePlay`, `grantedAt`) |
 | `isUserAnAffiliate()` | `bool` |
 | `signOutAffiliate()` | clears this device's referrer connection |
 | `getReferralProgramConfig()` | `ReferralProgramConfig?`: `enabled`, `companyName`, `referralTrigger`, `headline`, `rewardText`, `primaryColor` |
@@ -1039,7 +1039,7 @@ Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `IN
 
 **Rewarding referrers:** values on the device are for display. A modified device can fake them, so grant anything of real value (credits, premium time) from your server using the `referral.created` webhook or the Public API. For free premium time, use Apple/Google offer codes or RevenueCat promotional entitlements.
 
-**Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. The drop-in screen takes the same values as `appUserId` / `playPurchaseToken` options: it sends them when the user enrols, and calls `setReferrerAccount` for you when it opens for a user who is already enrolled. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. App Store offer codes appear in `rewardCodes`; they can only be redeemed on iOS, so the drop-in screen hides them on Android.
+**Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. The drop-in screen takes the same values as `appUserId` / `playPurchaseToken` options: it sends them when the user enrols, and calls `setReferrerAccount` for you when it opens for a user who is already enrolled. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. Reward codes appear in `rewardCodes`. Each has a `store`: `'app_store'` for an App Store offer code (iOS only) or `'google_play'` for a Google Play promo code (Android only, `redeemUrl` is `https://play.google.com/redeem?code=...`). Codes from older servers have no store and are read as `'app_store'`. The drop-in screen lists only the codes the phone can redeem; `rewardCodesForPlatform(codes, platform: defaultTargetPlatform, isWeb: kIsWeb)` does the same filtering for your own UI.
 
 **Store rules:** the SDK uses the system share sheet only and never reads Contacts. Never gate app features behind sharing, and never reward ratings or reviews.
 

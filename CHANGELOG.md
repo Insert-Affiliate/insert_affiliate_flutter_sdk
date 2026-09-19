@@ -1,5 +1,6 @@
 ## Unreleased
 - In-app referrals: enrol, verify and `setReferrerAccount` send the phone's OS (`os`: `ios` or `android`) so the server can pick the referrer's reward store. Left out on web and desktop.
+- In-app referrals: `ReferralRewardCode` has `store` (`app_store` or `google_play`, missing means `app_store`) with `isAppStore` / `isGooglePlay`. The Refer a friend screen lists App Store codes on iOS and Google Play promo codes on Android (all codes elsewhere), via the new `rewardCodesForPlatform`.
 
 ## 1.7.0
 Add short code usage tracking

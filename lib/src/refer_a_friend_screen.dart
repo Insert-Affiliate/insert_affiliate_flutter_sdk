@@ -474,8 +474,8 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     final hasLink = details.deeplinkUrl.startsWith('http');
     final premiumUntil = details.premiumUntil;
     final showPremium = premiumUntil != null && premiumUntil.isAfter(DateTime.now());
-    // Reward codes are App Store offer codes, which cannot be redeemed on Android.
-    final showRewardCodes = details.rewardCodes.isNotEmpty && defaultTargetPlatform != TargetPlatform.android;
+    // Only codes this phone's store can redeem (App Store on iOS, Google Play on Android).
+    final rewardCodes = rewardCodesForPlatform(details.rewardCodes, platform: defaultTargetPlatform, isWeb: kIsWeb);
     final boxDecoration = BoxDecoration(
       color: theme.colorScheme.primary.withValues(alpha: 0.08),
       borderRadius: radius,
@@ -542,11 +542,11 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
           textAlign: TextAlign.center,
         ),
       ],
-      if (showRewardCodes) ...[
+      if (rewardCodes.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text('Your rewards', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-        for (final reward in details.rewardCodes)
+        for (final reward in rewardCodes)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Container(

@@ -24,7 +24,8 @@ export 'src/referrals.dart'
         MyAffiliateDetails,
         ReferralRewardCode,
         ReferralProgramConfig,
-        buildReferralShareText;
+        buildReferralShareText,
+        rewardCodesForPlatform;
 export 'src/refer_a_friend_screen.dart' show ReferAFriendScreen, ReferAFriendOptions;
 
 typedef InsertAffiliateIdentifierChangeCallback = void Function(String? identifier, String? offerCode);

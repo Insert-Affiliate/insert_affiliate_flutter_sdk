@@ -159,26 +159,58 @@ class MyAffiliateDetails {
   }
 }
 
-/// An App Store one-time offer code granted to the referrer as a reward.
+/// A reward code granted to the referrer: an App Store one-time offer code, or
+/// a Google Play promo code if they were rewarded on an Android phone.
 class ReferralRewardCode {
+  static const String appStore = 'app_store';
+  static const String googlePlay = 'google_play';
+
   final String code;
 
-  /// Opens the App Store redemption sheet for [code].
+  /// Opens the store's redemption page for [code].
   final String redeemUrl;
+
+  /// Which store redeems [code]: [appStore] or [googlePlay]. Older servers
+  /// don't send it; those codes are App Store codes. Other values are kept.
+  final String store;
   final DateTime? grantedAt;
 
   const ReferralRewardCode({
     required this.code,
     required this.redeemUrl,
+    this.store = appStore,
     this.grantedAt,
   });
 
+  bool get isAppStore => store == appStore;
+  bool get isGooglePlay => store == googlePlay;
+
   factory ReferralRewardCode.fromJson(Map<String, dynamic> json) {
+    final store = _string(json['store']).trim();
     return ReferralRewardCode(
       code: _string(json['code']),
       redeemUrl: _string(json['redeemUrl']),
+      store: store.isEmpty ? appStore : store,
       grantedAt: _date(json['grantedAt']),
     );
+  }
+}
+
+/// The codes that can be redeemed on this phone: App Store codes on iOS,
+/// Google Play codes on Android, every code on web and desktop.
+List<ReferralRewardCode> rewardCodesForPlatform(
+  List<ReferralRewardCode> codes, {
+  required TargetPlatform platform,
+  bool isWeb = false,
+}) {
+  if (isWeb) return codes;
+  switch (platform) {
+    case TargetPlatform.iOS:
+      return codes.where((reward) => reward.isAppStore).toList();
+    case TargetPlatform.android:
+      return codes.where((reward) => reward.isGooglePlay).toList();
+    default:
+      return codes;
   }
 }
 

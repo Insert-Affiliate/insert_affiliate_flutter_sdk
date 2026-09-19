@@ -3,11 +3,68 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart' show InsertAffiliateFlutterSDK;
 import 'package:insert_affiliate_flutter_sdk/src/referrals.dart';
 import 'package:insert_affiliate_flutter_sdk/src/refer_a_friend_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _tokenKey = 'insert_affiliate_referrer_token_company123';
+
+/// Records the referral calls the drop-in screen makes.
+class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
+  _FakeSdk({this.enrolled = false});
+
+  final bool enrolled;
+  final List<Map<String, String?>> calls = [];
+
+  static const _details = MyAffiliateDetails(
+    affiliateName: 'Jane',
+    affiliateShortCode: 'ABC123',
+    deeplinkUrl: 'https://insertaffiliate.link/abc',
+    referralTrigger: 'purchase',
+    referralCount: 0,
+    installCount: 0,
+    eventCount: 0,
+    purchaseCount: 0,
+    totalEarned: 0,
+    totalPaid: 0,
+    totalUnpaid: 0,
+    currency: 'USD',
+    dashboardUrl: '',
+  );
+
+  @override
+  Future<ReferralProgramConfig?> getReferralProgramConfig() async => null;
+
+  @override
+  Future<MyAffiliateDetails?> getMyAffiliateDetails() async => enrolled ? _details : null;
+
+  @override
+  Future<bool> isUserAnAffiliate() async => enrolled;
+
+  @override
+  Future<AffiliateEnrolmentResult> createAffiliateForUser(String email, String name,
+      {String? appUserId, String? playPurchaseToken}) async {
+    calls.add({'method': 'enrol', 'appUserId': appUserId, 'playPurchaseToken': playPurchaseToken});
+    return const AffiliateEnrolmentResult(status: AffiliateEnrolmentStatus.verificationRequired);
+  }
+
+  @override
+  Future<AffiliateEnrolmentResult> verifyAffiliateCode(String email, String code,
+      {String? name, String? appUserId, String? playPurchaseToken}) async {
+    calls.add({'method': 'verify', 'appUserId': appUserId, 'playPurchaseToken': playPurchaseToken});
+    return const AffiliateEnrolmentResult.error('INVALID_CODE', 'Wrong code');
+  }
+
+  @override
+  Future<bool> setReferrerAccount({String? appUserId, String? playPurchaseToken}) async {
+    calls.add({'method': 'setReferrerAccount', 'appUserId': appUserId, 'playPurchaseToken': playPurchaseToken});
+    return true;
+  }
+}
+
+Widget _screen(_FakeSdk sdk, ReferAFriendOptions options) =>
+    MaterialApp(home: Scaffold(body: ReferAFriendScreen(sdk: sdk, options: options)));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -359,6 +416,43 @@ void main() {
       final config = await referrals.config();
       expect(config?.enabled, isTrue);
       expect(config?.companyName, 'Velvet');
+    });
+  });
+
+  group('ReferAFriendScreen account options', () {
+    const options = ReferAFriendOptions(email: 'jane@example.com', appUserId: 'rc_user_1', playPurchaseToken: 'play_tok');
+
+    testWidgets('enrol and verify pass appUserId and playPurchaseToken', (tester) async {
+      final sdk = _FakeSdk();
+      await tester.pumpWidget(_screen(sdk, options));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Get my link'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '123456');
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
+
+      expect(sdk.calls, [
+        {'method': 'enrol', 'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok'},
+        {'method': 'verify', 'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok'},
+      ]);
+    });
+
+    testWidgets('an enrolled user saves the account once when the screen opens', (tester) async {
+      final sdk = _FakeSdk(enrolled: true);
+      await tester.pumpWidget(_screen(sdk, options));
+      await tester.pumpAndSettle();
+      expect(sdk.calls, [
+        {'method': 'setReferrerAccount', 'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok'},
+      ]);
+    });
+
+    testWidgets('no account options means no setReferrerAccount call', (tester) async {
+      final sdk = _FakeSdk(enrolled: true);
+      await tester.pumpWidget(_screen(sdk, const ReferAFriendOptions()));
+      await tester.pumpAndSettle();
+      expect(sdk.calls, isEmpty);
     });
   });
 

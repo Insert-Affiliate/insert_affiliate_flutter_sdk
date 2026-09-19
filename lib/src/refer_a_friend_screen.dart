@@ -16,6 +16,15 @@ class ReferAFriendOptions {
   /// Prefills the name field.
   final String? name;
 
+  /// The user's RevenueCat app user id or Adapty customer user id, used to
+  /// grant referral rewards automatically. Sent when the user enrols, or via
+  /// `setReferrerAccount` when the screen opens for an enrolled user.
+  final String? appUserId;
+
+  /// The user's own Google Play subscription purchase token (Android), sent
+  /// the same way as [appUserId].
+  final String? playPurchaseToken;
+
   /// Share text. May use `{link}` and `{code}` placeholders.
   final String? shareMessage;
 
@@ -35,6 +44,8 @@ class ReferAFriendOptions {
   const ReferAFriendOptions({
     this.email,
     this.name,
+    this.appUserId,
+    this.playPurchaseToken,
     this.shareMessage,
     this.primaryColor,
     this.headline,
@@ -74,6 +85,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   MyAffiliateDetails? _details;
   String? _error;
   bool _busy = false;
+  bool _accountSaved = false;
 
   late final TextEditingController _emailController;
   late final TextEditingController _nameController;
@@ -108,6 +120,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     final config = results[0] as ReferralProgramConfig?;
     final details = results[1] as MyAffiliateDetails?;
     final stillConnected = details == null && await _sdk.isUserAnAffiliate();
+    if (details != null) _saveReferrerAccount();
     if (!mounted) return;
     setState(() {
       _config = config;
@@ -127,6 +140,16 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     });
   }
 
+  bool get _hasAccount =>
+      (_options.appUserId?.trim().isNotEmpty ?? false) || (_options.playPurchaseToken?.trim().isNotEmpty ?? false);
+
+  // Lets the server grant rewards that were waiting for the referrer's account. Once per screen.
+  void _saveReferrerAccount() {
+    if (_accountSaved || !_hasAccount) return;
+    _accountSaved = true;
+    _sdk.setReferrerAccount(appUserId: _options.appUserId, playPurchaseToken: _options.playPurchaseToken);
+  }
+
   Future<void> _enrol() async {
     final email = _emailController.text.trim();
     if (!email.contains('@')) {
@@ -137,7 +160,12 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       _busy = true;
       _error = null;
     });
-    final result = await _sdk.createAffiliateForUser(email, _nameController.text);
+    final result = await _sdk.createAffiliateForUser(
+      email,
+      _nameController.text,
+      appUserId: _options.appUserId,
+      playPurchaseToken: _options.playPurchaseToken,
+    );
     await _handleResult(result);
   }
 
@@ -151,7 +179,13 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       _busy = true;
       _error = null;
     });
-    final result = await _sdk.verifyAffiliateCode(_emailController.text, code, name: _nameController.text);
+    final result = await _sdk.verifyAffiliateCode(
+      _emailController.text,
+      code,
+      name: _nameController.text,
+      appUserId: _options.appUserId,
+      playPurchaseToken: _options.playPurchaseToken,
+    );
     await _handleResult(result);
   }
 

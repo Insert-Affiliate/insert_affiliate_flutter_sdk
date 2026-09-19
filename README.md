@@ -961,6 +961,7 @@ await insertAffiliateSdk.showReferAFriend(
   options: ReferAFriendOptions(
     email: currentUser.email, // prefill with your logged-in user
     name: currentUser.name,
+    appUserId: revenueCatAppUserId, // optional, for automatic rewards (see below)
     shareMessage: 'Get a free week of MyApp: {link}', // optional, supports {link} and {code}
     primaryColor: Colors.teal,  // optional, overrides the dashboard colour
     headline: 'Invite friends', // optional, overrides the dashboard copy
@@ -1038,7 +1039,7 @@ Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `IN
 
 **Rewarding referrers:** values on the device are for display. A modified device can fake them, so grant anything of real value (credits, premium time) from your server using the `referral.created` webhook or the Public API. For free premium time, use Apple/Google offer codes or RevenueCat promotional entitlements.
 
-**Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. App Store offer codes appear in `rewardCodes`; they can only be redeemed on iOS, so the drop-in screen hides them on Android.
+**Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. The drop-in screen takes the same values as `appUserId` / `playPurchaseToken` options: it sends them when the user enrols, and calls `setReferrerAccount` for you when it opens for a user who is already enrolled. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. App Store offer codes appear in `rewardCodes`; they can only be redeemed on iOS, so the drop-in screen hides them on Android.
 
 **Store rules:** the SDK uses the system share sheet only and never reads Contacts. Never gate app features behind sharing, and never reward ratings or reviews.
 

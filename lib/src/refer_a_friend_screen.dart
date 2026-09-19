@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../insert_affiliate_flutter_sdk.dart';
+import 'referrals.dart' show normaliseVerificationCode;
 
 /// Options for the drop-in "Refer a friend" screen.
 ///
@@ -170,7 +171,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   }
 
   Future<void> _verify() async {
-    final code = _codeController.text.trim();
+    final code = normaliseVerificationCode(_codeController.text);
     if (code.length != 6) {
       setState(() => _error = 'Enter the 6-digit code from the email.');
       return;
@@ -402,7 +403,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     );
   }
 
-  Widget _primaryButton(String label, VoidCallback onPressed, {Key? key}) {
+  Widget _primaryButton(String label, VoidCallback? onPressed, {Key? key}) {
     return ElevatedButton(
       key: key,
       onPressed: _busy ? null : onPressed,
@@ -448,12 +449,18 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
         keyboardType: TextInputType.number,
         maxLength: 6,
         autofillHints: const [AutofillHints.oneTimeCode],
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        // Any script's digits (Arabic-Indic, fullwidth, ...) become 0-9; spaces and other characters are dropped.
+        inputFormatters: [_verificationCodeFormatter],
         decoration: const InputDecoration(labelText: 'Code', counterText: ''),
       ),
       const SizedBox(height: 16),
       _errorText(theme),
-      _primaryButton('Verify', _verify),
+      // Verify is enabled at exactly 6 digits.
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _codeController,
+        builder: (context, value, _) =>
+            _primaryButton('Verify', normaliseVerificationCode(value.text).length == 6 ? _verify : null),
+      ),
       const SizedBox(height: 8),
       TextButton(onPressed: _busy ? null : _enrol, child: const Text('Send a new code')),
       TextButton(
@@ -590,6 +597,13 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     );
   }
 }
+
+/// Keeps the code field to ASCII digits: see [normaliseVerificationCode].
+final TextInputFormatter _verificationCodeFormatter = TextInputFormatter.withFunction((oldValue, newValue) {
+  final digits = normaliseVerificationCode(newValue.text);
+  if (digits == newValue.text) return newValue;
+  return TextEditingValue(text: digits, selection: TextSelection.collapsed(offset: digits.length));
+});
 
 /// Parses `#RRGGBB` (or `RRGGBB`) into a colour, or null.
 Color? parseReferralHexColor(String? hex) {

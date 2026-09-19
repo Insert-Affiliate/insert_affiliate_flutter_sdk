@@ -34,6 +34,7 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   final bool enrolled;
   final MyAffiliateDetails details;
   final List<Map<String, String?>> calls = [];
+  String? verifiedCode;
 
   static const _details = MyAffiliateDetails(
     affiliateName: 'Jane',
@@ -71,6 +72,7 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   Future<AffiliateEnrolmentResult> verifyAffiliateCode(String email, String code,
       {String? name, String? appUserId, String? playPurchaseToken}) async {
     calls.add({'method': 'verify', 'appUserId': appUserId, 'playPurchaseToken': playPurchaseToken});
+    verifiedCode = code;
     return const AffiliateEnrolmentResult.error('INVALID_CODE', 'Wrong code');
   }
 
@@ -384,6 +386,16 @@ void main() {
       expect(result.errorCode, 'NETWORK_ERROR');
     });
 
+    test('verify sends the code as ASCII digits', () async {
+      late Map<String, dynamic> sent;
+      final referrals = client((request) async {
+        sent = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(jsonEncode({'error': 'That code is wrong or has expired.', 'code': 'INVALID_CODE'}), 400);
+      });
+      await referrals.verify('jane@example.com', ' \u0661\u0662\u0663 \u0664\u0665\u0666 ');
+      expect(sent['code'], '123456');
+    });
+
     test('verify connected stores the token', () async {
       final referrals = client((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -550,6 +562,7 @@ void main() {
       await tester.tap(find.text('Get my link'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '123456');
+      await tester.pump();
       await tester.tap(find.text('Verify'));
       await tester.pumpAndSettle();
 
@@ -573,6 +586,71 @@ void main() {
       await tester.pumpWidget(_screen(sdk, const ReferAFriendOptions()));
       await tester.pumpAndSettle();
       expect(sdk.calls, isEmpty);
+    });
+  });
+
+  group('normaliseVerificationCode', () {
+    test('keeps ASCII digits', () {
+      expect(normaliseVerificationCode('123456'), '123456');
+    });
+
+    test('maps other scripts\' digits to ASCII', () {
+      expect(normaliseVerificationCode('\u0661\u0662\u0663\u0664\u0665\u0666'), '123456', reason: 'Arabic-Indic');
+      expect(normaliseVerificationCode('\u06F1\u06F2\u06F3\u06F4\u06F5\u06F6'), '123456', reason: 'Extended Arabic-Indic');
+      expect(normaliseVerificationCode('\u0967\u0968\u0969\u096A\u096B\u096C'), '123456', reason: 'Devanagari');
+      expect(normaliseVerificationCode('\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16'), '123456', reason: 'fullwidth');
+      expect(normaliseVerificationCode('\u0E51\u0E52\u0E53\u0E54\u0E55\u0E56'), '123456', reason: 'Thai');
+      expect(normaliseVerificationCode('\u0660\u0669\uFF10\uFF19'), '0909');
+    });
+
+    test('drops everything that is not a digit', () {
+      expect(normaliseVerificationCode(' 123-456 '), '123456');
+      expect(normaliseVerificationCode('Code: 12 34 56.'), '123456');
+      expect(normaliseVerificationCode('\u00B2\u2460\u216B abc'), '', reason: 'superscript, circled and Roman numerals are not decimal digits');
+      expect(normaliseVerificationCode(''), '');
+    });
+  });
+
+  group('ReferAFriendScreen code step', () {
+    Future<_FakeSdk> pumpCodeStep(WidgetTester tester) async {
+      final sdk = _FakeSdk();
+      await tester.pumpWidget(_screen(sdk, const ReferAFriendOptions(email: 'jane@example.com')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Get my link'));
+      await tester.pumpAndSettle();
+      return sdk;
+    }
+
+    bool verifyEnabled(WidgetTester tester) =>
+        tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Verify')).onPressed != null;
+
+    testWidgets('Verify is enabled at exactly 6 digits', (tester) async {
+      await pumpCodeStep(tester);
+      expect(verifyEnabled(tester), isFalse);
+      await tester.enterText(find.byType(TextField), '12345');
+      await tester.pump();
+      expect(verifyEnabled(tester), isFalse);
+      await tester.enterText(find.byType(TextField), '123456');
+      await tester.pump();
+      expect(verifyEnabled(tester), isTrue);
+    });
+
+    testWidgets('other scripts\' digits are typed as ASCII and verified', (tester) async {
+      final sdk = await pumpCodeStep(tester);
+      await tester.enterText(find.byType(TextField), '\u0661\u0662\u0663 \u0664\u0665\u0666');
+      await tester.pump();
+      expect(find.text('123456'), findsOneWidget);
+      expect(verifyEnabled(tester), isTrue);
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
+      expect(sdk.verifiedCode, '123456');
+    });
+
+    testWidgets('a pasted code with spaces and extra digits keeps the first 6 digits', (tester) async {
+      await pumpCodeStep(tester);
+      await tester.enterText(find.byType(TextField), 'Code: 123 4567');
+      await tester.pump();
+      expect(find.text('123456'), findsOneWidget);
     });
   });
 

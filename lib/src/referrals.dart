@@ -214,6 +214,33 @@ List<ReferralRewardCode> rewardCodesForPlatform(
   }
 }
 
+/// The first code point (the zero) of each Unicode block of ten decimal digits
+/// in the Basic Multilingual Plane: ASCII, Arabic-Indic, Extended Arabic-Indic,
+/// NKo, the Indic scripts, Thai, Lao, Tibetan, Myanmar, Khmer, Mongolian and
+/// others, and fullwidth.
+const List<int> _decimalDigitZeros = [
+  0x0030, 0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, //
+  0x0C66, 0x0CE6, 0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0,
+  0x1810, 0x1946, 0x19D0, 0x1A80, 0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620,
+  0xA8D0, 0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0, 0xFF10,
+];
+
+/// The emailed verification code as ASCII digits: every decimal digit (such as
+/// Arabic-Indic `٣` or fullwidth `３`) becomes `0`-`9` and everything else
+/// (spaces, dashes, letters) is dropped.
+String normaliseVerificationCode(String code) {
+  final digits = StringBuffer();
+  for (final rune in code.runes) {
+    for (final zero in _decimalDigitZeros) {
+      if (rune >= zero && rune <= zero + 9) {
+        digits.writeCharCode(0x30 + rune - zero);
+        break;
+      }
+    }
+  }
+  return digits.toString();
+}
+
 /// The app's in-app referral program settings from the Insert Affiliate portal.
 /// Text fields are empty when the company has not set them.
 class ReferralProgramConfig {
@@ -408,7 +435,7 @@ class InsertAffiliateReferrals {
     return _enrolOrVerify('/verify', {
       'companyId': companyCode,
       'email': email.trim(),
-      'code': code.trim(),
+      'code': normaliseVerificationCode(code),
       'name': (name ?? '').trim(),
       'platform': _platform,
       ...await _identityFields(appUserId: appUserId, playPurchaseToken: playPurchaseToken),

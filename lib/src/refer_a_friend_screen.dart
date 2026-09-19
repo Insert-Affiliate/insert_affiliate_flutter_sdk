@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -261,6 +262,12 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     }
   }
 
+  Future<void> _redeem(ReferralRewardCode reward) async {
+    final uri = Uri.tryParse(reward.redeemUrl);
+    final opened = uri != null && reward.redeemUrl.isNotEmpty && await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) await _copy(reward.code, 'Code');
+  }
+
   Future<void> _openDashboard(String url) async {
     final uri = Uri.tryParse(url);
     final opened = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -431,6 +438,10 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   List<Widget> _enrolled(ThemeData theme, BorderRadius radius) {
     final details = _details!;
     final hasLink = details.deeplinkUrl.startsWith('http');
+    final premiumUntil = details.premiumUntil;
+    final showPremium = premiumUntil != null && premiumUntil.isAfter(DateTime.now());
+    // Reward codes are App Store offer codes, which cannot be redeemed on Android.
+    final showRewardCodes = details.rewardCodes.isNotEmpty && defaultTargetPlatform != TargetPlatform.android;
     final boxDecoration = BoxDecoration(
       color: theme.colorScheme.primary.withValues(alpha: 0.08),
       borderRadius: radius,
@@ -489,6 +500,35 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
           Expanded(child: _stat(theme, 'Earned', formatReferralAmount(details.totalEarned, details.currency))),
         ],
       ),
+      if (showPremium) ...[
+        const SizedBox(height: 12),
+        Text(
+          'Free premium until ${MaterialLocalizations.of(context).formatMediumDate(premiumUntil.toLocal())}',
+          style: theme.textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+      ],
+      if (showRewardCodes) ...[
+        const SizedBox(height: 16),
+        Text('Your rewards', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        for (final reward in details.rewardCodes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              decoration: boxDecoration,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(reward.code, style: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1)),
+                  ),
+                  TextButton(onPressed: () => _redeem(reward), child: const Text('Redeem')),
+                ],
+              ),
+            ),
+          ),
+      ],
       if (details.dashboardUrl.isNotEmpty) ...[
         const SizedBox(height: 8),
         TextButton(

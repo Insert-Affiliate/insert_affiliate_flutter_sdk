@@ -102,6 +102,15 @@ class MyAffiliateDetails {
   final String currency;
   final String dashboardUrl;
 
+  /// How many referral rewards the referrer has been granted.
+  final int rewardsGranted;
+
+  /// When free premium from referral rewards ends, or null when there is none.
+  final DateTime? premiumUntil;
+
+  /// App Store one-time offer codes granted as rewards, newest first.
+  final List<ReferralRewardCode> rewardCodes;
+
   const MyAffiliateDetails({
     required this.affiliateName,
     required this.affiliateShortCode,
@@ -116,6 +125,9 @@ class MyAffiliateDetails {
     required this.totalUnpaid,
     required this.currency,
     required this.dashboardUrl,
+    this.rewardsGranted = 0,
+    this.premiumUntil,
+    this.rewardCodes = const [],
   });
 
   factory MyAffiliateDetails.fromJson(Map<String, dynamic> json) {
@@ -133,6 +145,38 @@ class MyAffiliateDetails {
       totalUnpaid: _double(json['totalUnpaid']),
       currency: _string(json['currency'], fallback: 'USD'),
       dashboardUrl: _string(json['dashboardUrl']),
+      rewardsGranted: _int(json['rewardsGranted']),
+      premiumUntil: _date(json['premiumUntil']),
+      rewardCodes: json['rewardCodes'] is List
+          ? (json['rewardCodes'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(ReferralRewardCode.fromJson)
+              .where((reward) => reward.code.isNotEmpty)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+/// An App Store one-time offer code granted to the referrer as a reward.
+class ReferralRewardCode {
+  final String code;
+
+  /// Opens the App Store redemption sheet for [code].
+  final String redeemUrl;
+  final DateTime? grantedAt;
+
+  const ReferralRewardCode({
+    required this.code,
+    required this.redeemUrl,
+    this.grantedAt,
+  });
+
+  factory ReferralRewardCode.fromJson(Map<String, dynamic> json) {
+    return ReferralRewardCode(
+      code: _string(json['code']),
+      redeemUrl: _string(json['redeemUrl']),
+      grantedAt: _date(json['grantedAt']),
     );
   }
 }
@@ -214,21 +258,27 @@ class InsertAffiliateReferrals {
   final http.Client? _client;
   final void Function(String message) _verboseLog;
 
+  /// The device id from the SDK's `"{shortCode}-{deviceId}"` insert affiliate
+  /// identifier, sent so the server can spot self-referrals.
+  final Future<String?> Function()? _deviceId;
+
   InsertAffiliateReferrals({
     required this.companyCode,
     this.baseUrl = defaultBaseUrl,
     http.Client? client,
     void Function(String message)? verboseLog,
+    Future<String?> Function()? deviceId,
   })  : _client = client,
-        _verboseLog = verboseLog ?? ((_) {});
+        _verboseLog = verboseLog ?? ((_) {}),
+        _deviceId = deviceId;
 
   String get _tokenKey => '$_tokenKeyPrefix$companyCode';
 
   Uri _uri(String path) => Uri.parse('$baseUrl/V1/sdk/affiliate$path');
 
-  Future<http.Response> _post(String path, Map<String, dynamic> body) {
+  Future<http.Response> _post(String path, Map<String, dynamic> body, {Map<String, String>? extraHeaders}) {
     final uri = _uri(path);
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {'Content-Type': 'application/json', ...?extraHeaders};
     final encoded = jsonEncode(body);
     final request = _client != null
         ? _client.post(uri, headers: headers, body: encoded)
@@ -260,22 +310,42 @@ class InsertAffiliateReferrals {
 
   Future<bool> hasToken() async => (await _readToken()) != null;
 
-  Future<AffiliateEnrolmentResult> enrol(String email, String name) {
+  /// `deviceId` (when known) plus the app supplied ids that are not empty.
+  Future<Map<String, dynamic>> _identityFields({String? appUserId, String? playPurchaseToken}) async {
+    String? deviceId;
+    try {
+      deviceId = await _deviceId?.call();
+    } catch (error) {
+      _verboseLog('Referrals: could not read device id: $error');
+    }
+    return {
+      if (appUserId != null && appUserId.trim().isNotEmpty) 'appUserId': appUserId.trim(),
+      if (playPurchaseToken != null && playPurchaseToken.trim().isNotEmpty)
+        'playPurchaseToken': playPurchaseToken.trim(),
+      if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+    };
+  }
+
+  Future<AffiliateEnrolmentResult> enrol(String email, String name,
+      {String? appUserId, String? playPurchaseToken}) async {
     return _enrolOrVerify('/enrol', {
       'companyId': companyCode,
       'email': email.trim(),
       'name': name.trim(),
       'platform': _platform,
+      ...await _identityFields(appUserId: appUserId, playPurchaseToken: playPurchaseToken),
     });
   }
 
-  Future<AffiliateEnrolmentResult> verify(String email, String code, {String? name}) {
+  Future<AffiliateEnrolmentResult> verify(String email, String code,
+      {String? name, String? appUserId, String? playPurchaseToken}) async {
     return _enrolOrVerify('/verify', {
       'companyId': companyCode,
       'email': email.trim(),
       'code': code.trim(),
       'name': (name ?? '').trim(),
       'platform': _platform,
+      ...await _identityFields(appUserId: appUserId, playPurchaseToken: playPurchaseToken),
     });
   }
 
@@ -343,6 +413,32 @@ class InsertAffiliateReferrals {
     }
   }
 
+  /// Saves the connected referrer's RevenueCat / Adapty app user id or Google
+  /// Play purchase token. Returns false when not enrolled, when the token is no
+  /// longer valid (it is then cleared), or on a network or server error.
+  Future<bool> setIdentity({String? appUserId, String? playPurchaseToken}) async {
+    final token = await _readToken();
+    if (token == null) {
+      _verboseLog('Referrals: no referrer token stored');
+      return false;
+    }
+    try {
+      final body = await _identityFields(appUserId: appUserId, playPurchaseToken: playPurchaseToken);
+      final response = await _post('/me/identity', body, extraHeaders: {_tokenHeader: token});
+      _verboseLog('Referrals: /me/identity response status: ${response.statusCode}');
+      if (response.statusCode == 401 || response.statusCode == 404) {
+        await clearToken();
+        _verboseLog('Referrals: referrer token rejected, cleared');
+        return false;
+      }
+      if (response.statusCode != 200) return false;
+      return _decodeObject(response.body)?['saved'] == true;
+    } catch (error) {
+      _verboseLog('Referrals: /me/identity network error: $error');
+      return false;
+    }
+  }
+
   Future<ReferralProgramConfig?> config() async {
     if (companyCode.isEmpty) return null;
     try {
@@ -374,3 +470,5 @@ String _string(Object? value, {String fallback = ''}) =>
 int _int(Object? value) => value is num ? value.toInt() : 0;
 
 double _double(Object? value) => value is num ? value.toDouble() : 0;
+
+DateTime? _date(Object? value) => value is String && value.isNotEmpty ? DateTime.tryParse(value) : null;

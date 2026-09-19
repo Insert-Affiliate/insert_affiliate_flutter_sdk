@@ -22,6 +22,7 @@ export 'src/referrals.dart'
         AffiliateEnrolmentStatus,
         AffiliateEnrolmentResult,
         MyAffiliateDetails,
+        ReferralRewardCode,
         ReferralProgramConfig,
         buildReferralShareText;
 export 'src/refer_a_friend_screen.dart' show ReferAFriendScreen, ReferAFriendOptions;
@@ -52,8 +53,11 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   
   static const String _referrerLinkKey = 'referring_link';
 
-  late final InsertAffiliateReferrals _referrals =
-      InsertAffiliateReferrals(companyCode: companyCode, verboseLog: verboseLog);
+  late final InsertAffiliateReferrals _referrals = InsertAffiliateReferrals(
+    companyCode: companyCode,
+    verboseLog: verboseLog,
+    deviceId: _storeAndReturnShortUniqueDeviceId,
+  );
 
   InsertAffiliateFlutterSDK({
     required this.companyCode,
@@ -862,20 +866,41 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
   /// affiliate, or [AffiliateEnrolmentStatus.verificationRequired] when the
   /// email is already an affiliate: a 6-digit code was emailed, pass it to
   /// [verifyAffiliateCode].
-  Future<AffiliateEnrolmentResult> createAffiliateForUser(String email, String name) async {
+  ///
+  /// Pass [appUserId] (the RevenueCat app user id or Adapty customer user id)
+  /// and/or [playPurchaseToken] (the user's own Google Play subscription
+  /// purchase token) so referral rewards can be granted automatically.
+  Future<AffiliateEnrolmentResult> createAffiliateForUser(String email, String name,
+      {String? appUserId, String? playPurchaseToken}) async {
     verboseLog('Creating in-app referrer');
-    final result = await _referrals.enrol(email, name);
+    final result =
+        await _referrals.enrol(email, name, appUserId: appUserId, playPurchaseToken: playPurchaseToken);
     _logReferralResult('createAffiliateForUser', result);
     return result;
   }
 
   /// Finishes connecting with the code emailed after
-  /// [AffiliateEnrolmentStatus.verificationRequired].
-  Future<AffiliateEnrolmentResult> verifyAffiliateCode(String email, String code, {String? name}) async {
+  /// [AffiliateEnrolmentStatus.verificationRequired]. [appUserId] and
+  /// [playPurchaseToken] are as for [createAffiliateForUser].
+  Future<AffiliateEnrolmentResult> verifyAffiliateCode(String email, String code,
+      {String? name, String? appUserId, String? playPurchaseToken}) async {
     verboseLog('Verifying in-app referrer code');
-    final result = await _referrals.verify(email, code, name: name);
+    final result = await _referrals.verify(email, code,
+        name: name, appUserId: appUserId, playPurchaseToken: playPurchaseToken);
     _logReferralResult('verifyAffiliateCode', result);
     return result;
+  }
+
+  /// Saves the connected referrer's [appUserId] (RevenueCat / Adapty) and/or
+  /// [playPurchaseToken] (Google Play). Call it when the user subscribes or
+  /// logs in after joining; the server then grants any rewards that were
+  /// waiting. Returns false when this device is not connected as a referrer
+  /// or the request fails.
+  Future<bool> setReferrerAccount({String? appUserId, String? playPurchaseToken}) async {
+    verboseLog('Saving in-app referrer account');
+    final saved = await _referrals.setIdentity(appUserId: appUserId, playPurchaseToken: playPurchaseToken);
+    if (!saved) errorLog('Could not save the referrer account.', 'warn');
+    return saved;
   }
 
   /// The connected referrer's details and referral stats, or null when this

@@ -970,15 +970,19 @@ await insertAffiliateSdk.showReferAFriend(
 );
 ```
 
-The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
+The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. When the referrer has been granted rewards it also shows "Free premium until {date}" (while that date is in the future) and, on iOS, a "Your rewards" list of App Store offer codes, each with a Redeem button. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
 
 Headline, reward text and colour come from your options first, then your dashboard settings, then the defaults ("Refer a friend", `#6A0DAD`), so you can change the wording without an app release. `fontFamily` and `cornerRadius` are also available.
 
 **Headless methods (build your own UI):**
 
 ```dart
-// Make the user a referrer
-final result = await insertAffiliateSdk.createAffiliateForUser('jane@example.com', 'Jane');
+// Make the user a referrer. appUserId and playPurchaseToken are optional (see Automatic rewards below).
+final result = await insertAffiliateSdk.createAffiliateForUser(
+  'jane@example.com',
+  'Jane',
+  appUserId: revenueCatAppUserId,
+);
 
 switch (result.status) {
   case AffiliateEnrolmentStatus.created:
@@ -999,7 +1003,14 @@ switch (result.status) {
 final me = await insertAffiliateSdk.getMyAffiliateDetails();
 if (me != null) {
   print('${me.referralCount} referrals, earned ${me.totalEarned} ${me.currency}');
+  print('${me.rewardsGranted} rewards, premium until ${me.premiumUntil}');
+  for (final reward in me.rewardCodes) {
+    print('${reward.code}: ${reward.redeemUrl}'); // App Store offer codes, newest first
+  }
 }
+
+// The user subscribed or logged in after joining: save their account so waiting rewards are granted
+await insertAffiliateSdk.setReferrerAccount(appUserId: revenueCatAppUserId);
 
 final isReferrer = await insertAffiliateSdk.isUserAnAffiliate(); // local check, no network
 final config = await insertAffiliateSdk.getReferralProgramConfig(); // dashboard settings
@@ -1009,9 +1020,10 @@ await insertAffiliateSdk.signOutAffiliate(); // call when your user logs out
 
 | Method | Returns |
 |---|---|
-| `createAffiliateForUser(email, name)` | `AffiliateEnrolmentResult` with status `created`, `verificationRequired` or `error` |
-| `verifyAffiliateCode(email, code, {name})` | `AffiliateEnrolmentResult` with status `connected`, `created` or `error` |
-| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl` |
+| `createAffiliateForUser(email, name, {appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `created`, `verificationRequired` or `error` |
+| `verifyAffiliateCode(email, code, {name, appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `connected`, `created` or `error` |
+| `setReferrerAccount({appUserId, playPurchaseToken})` | `bool`, false when not connected or the request fails |
+| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl`, `rewardsGranted`, `premiumUntil` (`DateTime?`), `rewardCodes` (`List<ReferralRewardCode>` with `code`, `redeemUrl`, `grantedAt`) |
 | `isUserAnAffiliate()` | `bool` |
 | `signOutAffiliate()` | clears this device's referrer connection |
 | `getReferralProgramConfig()` | `ReferralProgramConfig?`: `enabled`, `companyName`, `referralTrigger`, `headline`, `rewardText`, `primaryColor` |
@@ -1025,6 +1037,8 @@ Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `IN
 **How the device stays connected:** enrolling stores a private token for your company code in the SDK's app storage (the token is never logged). If the app is deleted, or the user moves to a new phone, calling `createAffiliateForUser` again with the same email sends them a code to reconnect. Their affiliate account and earnings are untouched.
 
 **Rewarding referrers:** values on the device are for display. A modified device can fake them, so grant anything of real value (credits, premium time) from your server using the `referral.created` webhook or the Public API. For free premium time, use Apple/Google offer codes or RevenueCat promotional entitlements.
+
+**Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. App Store offer codes appear in `rewardCodes`; they can only be redeemed on iOS, so the drop-in screen hides them on Android.
 
 **Store rules:** the SDK uses the system share sheet only and never reads Contacts. Never gate app features behind sharing, and never reward ratings or reviews.
 

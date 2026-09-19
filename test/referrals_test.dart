@@ -101,6 +101,38 @@ void main() {
       expect(details.referralCount, 0);
       expect(details.totalEarned, 0);
       expect(details.currency, 'USD');
+      expect(details.rewardsGranted, 0);
+      expect(details.premiumUntil, isNull);
+      expect(details.rewardCodes, isEmpty);
+    });
+
+    test('MyAffiliateDetails.fromJson reads rewards', () {
+      final details = MyAffiliateDetails.fromJson({
+        'rewardsGranted': 3,
+        'premiumUntil': '2026-10-01T12:00:00.000Z',
+        'rewardCodes': [
+          {
+            'code': 'FREEWEEK2',
+            'redeemUrl': 'https://apps.apple.com/redeem?ctx=offercodes&id=123&code=FREEWEEK2',
+            'grantedAt': '2026-09-18T10:00:00.000Z',
+          },
+          {'code': 'FREEWEEK1', 'redeemUrl': 'https://apps.apple.com/redeem?code=FREEWEEK1', 'grantedAt': null},
+          {'redeemUrl': 'https://ignored'},
+          'not an object',
+        ],
+      });
+      expect(details.rewardsGranted, 3);
+      expect(details.premiumUntil, DateTime.utc(2026, 10, 1, 12));
+      expect(details.rewardCodes.map((reward) => reward.code), ['FREEWEEK2', 'FREEWEEK1']);
+      expect(details.rewardCodes.first.redeemUrl, contains('code=FREEWEEK2'));
+      expect(details.rewardCodes.first.grantedAt, DateTime.utc(2026, 9, 18, 10));
+      expect(details.rewardCodes.last.grantedAt, isNull);
+    });
+
+    test('MyAffiliateDetails.fromJson ignores bad reward values', () {
+      final details = MyAffiliateDetails.fromJson({'premiumUntil': 'not a date', 'rewardCodes': 'nope'});
+      expect(details.premiumUntil, isNull);
+      expect(details.rewardCodes, isEmpty);
     });
 
     test('ReferralProgramConfig.fromJson', () {
@@ -173,6 +205,27 @@ void main() {
       expect(prefs.getString(_tokenKey), 'tok_1');
     });
 
+    test('enrol and verify send deviceId and the app supplied ids', () async {
+      final bodies = <Map<String, dynamic>>[];
+      final referrals = InsertAffiliateReferrals(
+        companyCode: 'company123',
+        deviceId: () async => 'dev123',
+        client: MockClient((request) async {
+          bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return http.Response(jsonEncode({'status': 'verificationRequired'}), 200);
+        }),
+      );
+
+      await referrals.enrol('jane@example.com', 'Jane', appUserId: ' rc_user_1 ', playPurchaseToken: 'play_tok');
+      await referrals.verify('jane@example.com', '123456', appUserId: '');
+      expect(bodies[0]['deviceId'], 'dev123');
+      expect(bodies[0]['appUserId'], 'rc_user_1');
+      expect(bodies[0]['playPurchaseToken'], 'play_tok');
+      expect(bodies[1]['deviceId'], 'dev123');
+      expect(bodies[1].containsKey('appUserId'), isFalse);
+      expect(bodies[1].containsKey('playPurchaseToken'), isFalse);
+    });
+
     test('enrol verificationRequired stores nothing', () async {
       final referrals = client((_) async => http.Response(jsonEncode({'status': 'verificationRequired'}), 200));
       final result = await referrals.enrol('jane@example.com', 'Jane');
@@ -243,6 +296,52 @@ void main() {
       final referrals = client((_) async => http.Response('oops', 500));
       expect(await referrals.me(), isNull);
       expect(await referrals.hasToken(), isTrue);
+    });
+
+    test('setIdentity returns false without a token and makes no request', () async {
+      var called = false;
+      final referrals = client((_) async {
+        called = true;
+        return http.Response('{}', 200);
+      });
+      expect(await referrals.setIdentity(appUserId: 'rc_user_1'), isFalse);
+      expect(called, isFalse);
+    });
+
+    test('setIdentity posts the ids with the token header', () async {
+      SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+      final referrals = InsertAffiliateReferrals(
+        companyCode: 'company123',
+        deviceId: () async => 'dev123',
+        client: MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.toString(), 'https://api.insertaffiliate.com/V1/sdk/affiliate/me/identity');
+          expect(request.headers['X-Insert-Affiliate-Token'], 'tok_1');
+          expect(jsonDecode(request.body), {'appUserId': 'rc_user_1', 'playPurchaseToken': 'play_tok', 'deviceId': 'dev123'});
+          return http.Response(jsonEncode({'saved': true}), 200);
+        }),
+      );
+      expect(await referrals.setIdentity(appUserId: 'rc_user_1', playPurchaseToken: 'play_tok'), isTrue);
+      expect(await referrals.hasToken(), isTrue);
+    });
+
+    test('setIdentity clears the token on 401 and 404', () async {
+      for (final status in [401, 404]) {
+        SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+        final referrals = client((_) async => http.Response(jsonEncode({'code': 'INVALID_TOKEN'}), status));
+        expect(await referrals.setIdentity(appUserId: 'rc_user_1'), isFalse);
+        expect(await referrals.hasToken(), isFalse);
+      }
+    });
+
+    test('setIdentity keeps the token on a server or network error', () async {
+      SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+      final failing = client((_) async => http.Response('oops', 500));
+      expect(await failing.setIdentity(appUserId: 'rc_user_1'), isFalse);
+      expect(await failing.hasToken(), isTrue);
+      final offline = client((_) async => throw http.ClientException('offline'));
+      expect(await offline.setIdentity(appUserId: 'rc_user_1'), isFalse);
+      expect(await offline.hasToken(), isTrue);
     });
 
     test('clearToken signs out', () async {

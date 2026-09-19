@@ -343,6 +343,23 @@ class InsertAffiliateReferrals {
 
   Future<bool> hasToken() async => (await _readToken()) != null;
 
+  /// Clears the stored token when the server rejected [sentToken]: 401 with
+  /// `INVALID_TOKEN` or 404 with `AFFILIATE_NOT_FOUND`. Any other error (a
+  /// proxy or gateway 401/404 included) keeps it. A token stored by another
+  /// request while this one was in flight is kept too.
+  Future<void> _clearIfTokenRejected(http.Response response, String sentToken) async {
+    final code = _decodeObject(response.body)?['code'];
+    final rejected = (response.statusCode == 401 && code == 'INVALID_TOKEN') ||
+        (response.statusCode == 404 && code == 'AFFILIATE_NOT_FOUND');
+    if (!rejected) return;
+    if (await _readToken() != sentToken) {
+      _verboseLog('Referrals: referrer token rejected, a newer token is kept');
+      return;
+    }
+    await clearToken();
+    _verboseLog('Referrals: referrer token rejected, cleared');
+  }
+
   /// The phone's OS, so the server can pick the referrer's reward store (App
   /// Store or Google Play). Null on web and desktop.
   static String? get _os {
@@ -448,12 +465,10 @@ class InsertAffiliateReferrals {
     try {
       final response = await _get('/me', headers: {_tokenHeader: token});
       _verboseLog('Referrals: /me response status: ${response.statusCode}');
-      if (response.statusCode == 401 || response.statusCode == 404) {
-        await clearToken();
-        _verboseLog('Referrals: referrer token rejected, cleared');
+      if (response.statusCode != 200) {
+        await _clearIfTokenRejected(response, token);
         return null;
       }
-      if (response.statusCode != 200) return null;
       final json = _decodeObject(response.body);
       return json == null ? null : MyAffiliateDetails.fromJson(json);
     } catch (error) {
@@ -475,12 +490,10 @@ class InsertAffiliateReferrals {
       final body = await _identityFields(appUserId: appUserId, playPurchaseToken: playPurchaseToken);
       final response = await _post('/me/identity', body, extraHeaders: {_tokenHeader: token});
       _verboseLog('Referrals: /me/identity response status: ${response.statusCode}');
-      if (response.statusCode == 401 || response.statusCode == 404) {
-        await clearToken();
-        _verboseLog('Referrals: referrer token rejected, cleared');
+      if (response.statusCode != 200) {
+        await _clearIfTokenRejected(response, token);
         return false;
       }
-      if (response.statusCode != 200) return false;
       return _decodeObject(response.body)?['saved'] == true;
     } catch (error) {
       _verboseLog('Referrals: /me/identity network error: $error');

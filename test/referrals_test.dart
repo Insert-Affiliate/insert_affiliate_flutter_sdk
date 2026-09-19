@@ -11,6 +11,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _tokenKey = 'insert_affiliate_referrer_token_company123';
 
+/// The responses that mean the stored referrer token is no longer valid.
+final _tokenRejections = <http.Response Function()>[
+  () => http.Response(jsonEncode({'error': 'Not connected. Enrol again.', 'code': 'INVALID_TOKEN'}), 401),
+  () => http.Response(jsonEncode({'error': 'This referral account no longer exists.', 'code': 'AFFILIATE_NOT_FOUND'}), 404),
+];
+
+/// 401 and 404 responses that don't reject the token (a proxy, a swapped code, no body).
+final _otherAuthErrors = <http.Response Function()>[
+  () => http.Response('Unauthorized', 401),
+  () => http.Response(jsonEncode({'code': 'AFFILIATE_NOT_FOUND'}), 401),
+  () => http.Response('<html>Not Found</html>', 404),
+  () => http.Response(jsonEncode({'code': 'INVALID_TOKEN'}), 404),
+  () => http.Response(jsonEncode({'error': 'Company not found.', 'code': 'COMPANY_NOT_FOUND'}), 404),
+  () => http.Response('', 404),
+];
+
 /// Records the referral calls the drop-in screen makes.
 class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   _FakeSdk({this.enrolled = false, this.details = _details});
@@ -400,13 +416,34 @@ void main() {
       expect(details?.referralCount, 3);
     });
 
-    test('me clears the token on 401 and 404', () async {
-      for (final status in [401, 404]) {
+    test('me clears the token on 401 INVALID_TOKEN and 404 AFFILIATE_NOT_FOUND', () async {
+      for (final rejection in _tokenRejections) {
         SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
-        final referrals = client((_) async => http.Response(jsonEncode({'code': 'INVALID_TOKEN'}), status));
+        final referrals = client((_) async => rejection());
         expect(await referrals.me(), isNull);
         expect(await referrals.hasToken(), isFalse);
       }
+    });
+
+    test('me keeps the token on any other 401 or 404', () async {
+      for (final response in _otherAuthErrors) {
+        SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+        final referrals = client((_) async => response());
+        expect(await referrals.me(), isNull);
+        expect(await referrals.hasToken(), isTrue);
+      }
+    });
+
+    test('me keeps a token stored while the rejected request was in flight', () async {
+      SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+      final referrals = client((_) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, 'tok_2');
+        return http.Response(jsonEncode({'code': 'INVALID_TOKEN'}), 401);
+      });
+      expect(await referrals.me(), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(_tokenKey), 'tok_2');
     });
 
     test('me keeps the token on a server error', () async {
@@ -444,13 +481,34 @@ void main() {
       expect(await referrals.hasToken(), isTrue);
     });
 
-    test('setIdentity clears the token on 401 and 404', () async {
-      for (final status in [401, 404]) {
+    test('setIdentity clears the token on 401 INVALID_TOKEN and 404 AFFILIATE_NOT_FOUND', () async {
+      for (final rejection in _tokenRejections) {
         SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
-        final referrals = client((_) async => http.Response(jsonEncode({'code': 'INVALID_TOKEN'}), status));
+        final referrals = client((_) async => rejection());
         expect(await referrals.setIdentity(appUserId: 'rc_user_1'), isFalse);
         expect(await referrals.hasToken(), isFalse);
       }
+    });
+
+    test('setIdentity keeps the token on any other 401 or 404', () async {
+      for (final response in _otherAuthErrors) {
+        SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+        final referrals = client((_) async => response());
+        expect(await referrals.setIdentity(appUserId: 'rc_user_1'), isFalse);
+        expect(await referrals.hasToken(), isTrue);
+      }
+    });
+
+    test('setIdentity keeps a token stored while the rejected request was in flight', () async {
+      SharedPreferences.setMockInitialValues({_tokenKey: 'tok_1'});
+      final referrals = client((_) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, 'tok_2');
+        return http.Response(jsonEncode({'code': 'AFFILIATE_NOT_FOUND'}), 404);
+      });
+      expect(await referrals.setIdentity(appUserId: 'rc_user_1'), isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(_tokenKey), 'tok_2');
     });
 
     test('setIdentity keeps the token on a server or network error', () async {

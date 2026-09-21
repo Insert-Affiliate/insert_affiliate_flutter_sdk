@@ -975,6 +975,67 @@ The screen handles every step: loading, the "Get my link" form, the 6-digit emai
 
 Headline, reward text and colour come from your options first, then your dashboard settings, then the defaults ("Refer a friend", `#6A0DAD`), so you can change the wording without an app release. `fontFamily` and `cornerRadius` are also available.
 
+**Translating or rewording the screen:** pass `strings`. Every field is optional, and one left out or blank keeps the English default below. `{email}` and `{date}` are replaced when the screen shows the text, so keep them in a translation.
+
+```dart
+await insertAffiliateSdk.showReferAFriend(
+  context,
+  options: const ReferAFriendOptions(
+    strings: ReferralStrings(
+      joinIntro: 'Receba o seu link para partilhar com amigos.',
+      emailLabel: 'Email',
+      nameLabel: 'Nome',
+      joinButton: 'Obter o meu link',
+      codeSentNotice: 'Enviamos um codigo de 6 digitos para {email}.',
+      verifyButton: 'Confirmar',
+      premiumUntil: 'Premium gratuito ate {date}',
+      errorNetwork: 'Sem ligacao. Tente novamente.',
+    ),
+  ),
+);
+```
+
+| Key | Default |
+|---|---|
+| `joinIntro` | Get your own link to share with friends. |
+| `emailLabel` | Email |
+| `nameLabel` | Name |
+| `joinButton` | Get my link |
+| `codeSentNotice` | We emailed a 6-digit code to {email}. Enter it below to connect. |
+| `codeLabel` | Code |
+| `verifyButton` | Verify |
+| `resendButton` | Send a new code |
+| `codeResentNotice` | We sent a new code. Check your email. |
+| `differentEmailButton` | Use a different email |
+| `codeLabelTitle` | Your code |
+| `copyButton` | Copy |
+| `copiedNotice` | Code copied |
+| `linkCopiedNotice` | Link copied |
+| `dashboardCopiedNotice` | Dashboard link copied |
+| `shareButton` | Share my link |
+| `shareCodeButton` | Share my code (Short Code Only apps) |
+| `referralsLabel` | Referrals |
+| `earnedLabel` | Earned |
+| `premiumUntil` | Free premium until {date} |
+| `rewardsHeading` | Your rewards |
+| `redeemButton` | Redeem |
+| `dashboardLink` | Open my dashboard |
+| `closeButton` | Close (the close button's tooltip) |
+| `loading` | Loading... (screen reader label on the spinner) |
+| `tryAgainButton` | Try again |
+| `errorProgramDisabled` | Referrals are not available in this app right now. |
+| `errorAffiliateLimitReached` | The referral program is full right now. Please try again later. |
+| `errorInvalidCode` | That code is wrong or has expired. Check the email or send a new code. |
+| `errorTooManyCodes` | Too many codes requested. Please wait a while and try again. |
+| `errorRateLimited` | Too many attempts. Please wait a moment and try again. |
+| `errorInvalidEmail` | Please enter a valid email address. |
+| `errorNetwork` | Could not connect. Check your connection and try again. |
+| `errorServer` | Something went wrong. Please try again. |
+| `errorCodeIncomplete` | Enter the 6-digit code from the email. |
+| `errorShareFailed` | Could not open the share sheet. Copy your link instead. |
+
+The headline and the reward line are not in `strings`: they stay on `headline` and `rewardText`, which fall back to your dashboard settings.
+
 **Headless methods (build your own UI):**
 
 ```dart
@@ -1040,6 +1101,19 @@ Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `IN
 **Rewarding referrers:** values on the device are for display. A modified device can fake them, so grant anything of real value (credits, premium time) from your server using the `referral.created` webhook or the Public API. For free premium time, use Apple/Google offer codes or RevenueCat promotional entitlements.
 
 **Automatic rewards:** when referrer rewards are set up in the dashboard (RevenueCat, Adapty, App Store offer codes or Google Play), Insert Affiliate grants them for you. To know who to reward, pass the referrer's `appUserId` (RevenueCat app user id or Adapty customer user id) and/or `playPurchaseToken` (their own Google Play subscription purchase token) to `createAffiliateForUser` / `verifyAffiliateCode`. The drop-in screen takes the same values as `appUserId` / `playPurchaseToken` options: it sends them when the user enrols, and calls `setReferrerAccount` for you when it opens for a user who is already enrolled. If the user subscribes or logs in later, call `setReferrerAccount` then; any rewards that were waiting are granted. The SDK also sends its device id so a user cannot refer themselves. Reward codes appear in `rewardCodes`. Each has a `store`: `'app_store'` for an App Store offer code (iOS only) or `'google_play'` for a Google Play promo code (Android only, `redeemUrl` is `https://play.google.com/redeem?code=...`). Codes from older servers have no store and are read as `'app_store'`. The drop-in screen lists only the codes the phone can redeem; `rewardCodesForPlatform(codes, platform: defaultTargetPlatform, isWeb: kIsWeb)` does the same filtering for your own UI.
+
+**Build your own screen:** everything the drop-in screen does is a method call, so you can ignore `ReferAFriendScreen` entirely. In the order you would call them:
+
+1. `getReferralProgramConfig()` for the program settings and copy. `enabled` false means joining is refused.
+2. `isUserAnAffiliate()` to see whether this device is already connected, without a network call.
+3. **Not enrolled:** `createAffiliateForUser(email, name)`. `status` is `created` (connected, `result.affiliate` has the code and link), `verificationRequired`, or `error`.
+4. **Code needed:** `verifyAffiliateCode(email, code)` with the 6-digit code from the email. Call `createAffiliateForUser` again to send a new code, and go back to step 3 for a different email. Digits typed in any script are accepted.
+5. **Enrolled:** `getMyAffiliateDetails()` for the code, link, `referralCount`, earnings and `dashboardUrl`.
+6. **Rewards:** on the same object, `rewardsGranted`, `premiumUntil` and `rewardCodes` (each with `code`, `redeemUrl`, `store`, `grantedAt`). `rewardCodesForPlatform(codes, platform: defaultTargetPlatform, isWeb: kIsWeb)` keeps the ones this phone can redeem, and `buildReferralShareText(...)` builds the same share text the screen uses.
+7. **Sharing:** `shareReferralLink()` for the system share sheet, or your own UI around the link and code.
+8. **Accounts and sign out:** `setReferrerAccount(...)` when the user subscribes or logs in, `signOutAffiliate()` when they log out.
+
+**Errors:** `createAffiliateForUser` and `verifyAffiliateCode` return `errorCode` (`PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_CODE`, `TOO_MANY_CODES`, `RATE_LIMITED`, `INVALID_EMAIL`, `NETWORK_ERROR`, `INVALID_COMPANY_ID`, `INVALID_RESPONSE`, or `HTTP_<status>`) and `errorMessage`, so you can write your own wording. `getMyAffiliateDetails()` and `getReferralProgramConfig()` return null instead of a code: after a null, `isUserAnAffiliate()` returning true means the device is still connected and the call failed for network reasons, which is exactly how the drop-in screen tells the two apart.
 
 **Store rules:** the SDK uses the system share sheet only and never reads Contacts. Never gate app features behind sharing, and never reward ratings or reviews.
 

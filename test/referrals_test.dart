@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:insert_affiliate_flutter_sdk/insert_affiliate_flutter_sdk.dart' show InsertAffiliateFlutterSDK;
 import 'package:insert_affiliate_flutter_sdk/src/referrals.dart';
 import 'package:insert_affiliate_flutter_sdk/src/refer_a_friend_screen.dart';
+import 'package:insert_affiliate_flutter_sdk/src/referral_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _tokenKey = 'insert_affiliate_referrer_token_company123';
@@ -30,9 +31,11 @@ final _otherAuthErrors = <http.Response Function()>[
 
 /// Records the referral calls the drop-in screen makes.
 class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
-  _FakeSdk({this.enrolled = false, this.details = _details});
+  _FakeSdk({this.enrolled = false, this.details = _details, this.loadDelay = Duration.zero});
 
   final bool enrolled;
+  /// Holds the screen in its loading state for as long as a test needs.
+  final Duration loadDelay;
   final MyAffiliateDetails details;
   final List<Map<String, String?>> calls = [];
   String? verifiedCode;
@@ -54,10 +57,16 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   );
 
   @override
-  Future<ReferralProgramConfig?> getReferralProgramConfig() async => null;
+  Future<ReferralProgramConfig?> getReferralProgramConfig() async {
+    await Future<void>.delayed(loadDelay);
+    return null;
+  }
 
   @override
-  Future<MyAffiliateDetails?> getMyAffiliateDetails() async => enrolled ? details : null;
+  Future<MyAffiliateDetails?> getMyAffiliateDetails() async {
+    await Future<void>.delayed(loadDelay);
+    return enrolled ? details : null;
+  }
 
   @override
   Future<bool> isUserAnAffiliate() async => enrolled;
@@ -84,8 +93,10 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   }
 }
 
+// A fresh key each time, so pumping a second screen in one test starts it again
+// rather than reusing the first one's state.
 Widget _screen(_FakeSdk sdk, ReferAFriendOptions options) =>
-    MaterialApp(home: Scaffold(body: ReferAFriendScreen(sdk: sdk, options: options)));
+    MaterialApp(home: Scaffold(body: ReferAFriendScreen(key: UniqueKey(), sdk: sdk, options: options)));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -792,6 +803,244 @@ void main() {
     test('formatReferralAmount', () {
       expect(formatReferralAmount(42.5, 'USD'), r'$42.50');
       expect(formatReferralAmount(3, 'SEK'), '3.00 SEK');
+    });
+  });
+
+  group('ReferralStrings', () {
+    test('referralText falls back for null, empty and blank', () {
+      expect(referralText('Obter o meu link', 'Get my link'), 'Obter o meu link');
+      expect(referralText('  padded  ', 'Get my link'), 'padded');
+      expect(referralText(null, 'Get my link'), 'Get my link');
+      expect(referralText('', 'Get my link'), 'Get my link');
+      expect(referralText('   ', 'Get my link'), 'Get my link');
+    });
+
+    test('fillReferralPlaceholders replaces every mention and leaves the rest alone', () {
+      expect(
+        fillReferralPlaceholders('Premium gratuito ate {date}', {'date': '1 Oct 2026'}),
+        'Premium gratuito ate 1 Oct 2026',
+      );
+      expect(
+        fillReferralPlaceholders('{email}? {email}.', {'email': 'jane@example.com'}),
+        'jane@example.com? jane@example.com.',
+      );
+      expect(fillReferralPlaceholders('No placeholder here', {'date': 'x'}), 'No placeholder here');
+    });
+  });
+
+  group('ReferAFriendScreen strings', () {
+    final premiumUntil = DateTime.now().add(const Duration(days: 30));
+    final joined = MyAffiliateDetails(
+      affiliateName: 'Jane',
+      affiliateShortCode: 'ABC123',
+      deeplinkUrl: 'https://insertaffiliate.link/abc',
+      referralTrigger: 'purchase',
+      referralCount: 4,
+      installCount: 0,
+      eventCount: 0,
+      purchaseCount: 4,
+      totalEarned: 12.5,
+      totalPaid: 0,
+      totalUnpaid: 12.5,
+      currency: 'USD',
+      dashboardUrl: 'https://app.insertaffiliate.com/signin',
+      rewardsGranted: 1,
+      premiumUntil: premiumUntil,
+      rewardCodes: const [
+        ReferralRewardCode(code: 'PLAY1', redeemUrl: 'https://play.google.com/redeem?code=PLAY1', store: 'google_play'),
+      ],
+    );
+
+    Future<void> pumpJoined(WidgetTester tester, ReferralStrings strings) async {
+      await tester.pumpWidget(_screen(_FakeSdk(enrolled: true, details: joined), ReferAFriendOptions(strings: strings)));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> pumpCodeStep(WidgetTester tester, ReferralStrings strings) async {
+      await tester.pumpWidget(_screen(
+        _FakeSdk(),
+        ReferAFriendOptions(email: 'jane@example.com', strings: strings),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(referralText(strings.joinButton, 'Get my link')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the English defaults are used when nothing is passed', (tester) async {
+      await tester.pumpWidget(_screen(_FakeSdk(), const ReferAFriendOptions()));
+      await tester.pumpAndSettle();
+      expect(find.text('Get your own link to share with friends.'), findsOneWidget);
+      expect(find.text('Email'), findsOneWidget);
+      expect(find.text('Name'), findsOneWidget);
+      expect(find.text('Get my link'), findsOneWidget);
+      expect(find.byTooltip('Close'), findsOneWidget);
+
+      await pumpJoined(tester, const ReferralStrings());
+      expect(find.text('Your code'), findsOneWidget);
+      expect(find.text('Copy'), findsNWidgets(2));
+      expect(find.text('Share my link'), findsOneWidget);
+      expect(find.text('Referrals'), findsOneWidget);
+      expect(find.text('Earned'), findsOneWidget);
+      expect(find.text('Your rewards'), findsOneWidget);
+      expect(find.text('Redeem'), findsOneWidget);
+      expect(find.text('Open my dashboard'), findsOneWidget);
+      expect(find.textContaining('Free premium until '), findsOneWidget);
+    });
+
+    testWidgets('one overridden key leaves the rest as defaults', (tester) async {
+      await pumpJoined(tester, const ReferralStrings(shareButton: 'Convidar amigos'));
+      expect(find.text('Convidar amigos'), findsOneWidget);
+      expect(find.text('Share my link'), findsNothing);
+      expect(find.text('Your code'), findsOneWidget);
+      expect(find.text('Referrals'), findsOneWidget);
+      expect(find.text('Open my dashboard'), findsOneWidget);
+    });
+
+    testWidgets('an empty or blank override falls back to the default', (tester) async {
+      await pumpJoined(tester, const ReferralStrings(shareButton: '', referralsLabel: '   '));
+      expect(find.text('Share my link'), findsOneWidget);
+      expect(find.text('Referrals'), findsOneWidget);
+    });
+
+    testWidgets('the joined screen uses every override', (tester) async {
+      await pumpJoined(
+        tester,
+        const ReferralStrings(
+          codeLabelTitle: 'O seu codigo',
+          copyButton: 'Copiar',
+          shareButton: 'Partilhar',
+          referralsLabel: 'Convites',
+          earnedLabel: 'Ganho',
+          rewardsHeading: 'As suas recompensas',
+          redeemButton: 'Resgatar',
+          dashboardLink: 'Abrir o meu painel',
+        ),
+      );
+      for (final label in ['O seu codigo', 'Copiar', 'Partilhar', 'Convites', 'Ganho', 'As suas recompensas',
+        'Resgatar', 'Abrir o meu painel']) {
+        expect(find.text(label), findsWidgets, reason: label);
+      }
+    });
+
+    testWidgets('{date} in premiumUntil is replaced', (tester) async {
+      await pumpJoined(tester, const ReferralStrings(premiumUntil: 'Premium gratuito ate {date}'));
+      final formatted = find.textContaining('Premium gratuito ate ').evaluate().single.widget as Text;
+      expect(formatted.data, isNot(contains('{date}')));
+      expect(formatted.data, contains('${premiumUntil.toLocal().day}'));
+    });
+
+    testWidgets('{email} in codeSentNotice is replaced', (tester) async {
+      await pumpCodeStep(tester, const ReferralStrings(codeSentNotice: 'Codigo enviado para {email}.'));
+      expect(find.text('Codigo enviado para jane@example.com.'), findsOneWidget);
+    });
+
+    testWidgets('the code step uses its overrides', (tester) async {
+      await pumpCodeStep(
+        tester,
+        const ReferralStrings(
+          joinButton: 'Obter o meu link',
+          codeLabel: 'Codigo',
+          verifyButton: 'Confirmar',
+          resendButton: 'Enviar outro codigo',
+          differentEmailButton: 'Usar outro email',
+        ),
+      );
+      expect(find.text('Codigo'), findsOneWidget);
+      expect(find.text('Confirmar'), findsOneWidget);
+      expect(find.text('Enviar outro codigo'), findsOneWidget);
+      expect(find.text('Usar outro email'), findsOneWidget);
+    });
+
+    testWidgets('a resent code is confirmed, in the app\'s wording', (tester) async {
+      await pumpCodeStep(tester, const ReferralStrings());
+      await tester.tap(find.text('Send a new code'));
+      await tester.pumpAndSettle();
+      expect(find.text('We sent a new code. Check your email.'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('We sent a new code. Check your email.'), findsNothing);
+
+      await pumpCodeStep(tester, const ReferralStrings(codeResentNotice: 'Enviamos outro codigo.'));
+      await tester.tap(find.text('Send a new code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enviamos outro codigo.'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('a server error uses the wording for its code', (tester) async {
+      await pumpCodeStep(tester, const ReferralStrings(errorInvalidCode: 'Codigo errado.'));
+      await tester.enterText(find.byType(TextField), '123456');
+      await tester.pump();
+      await tester.tap(find.text('Verify'));
+      await tester.pumpAndSettle();
+      expect(find.text('Codigo errado.'), findsOneWidget);
+    });
+
+    testWidgets('a bad email uses the errorInvalidEmail wording', (tester) async {
+      await tester.pumpWidget(_screen(
+        _FakeSdk(),
+        const ReferAFriendOptions(email: 'not-an-email', strings: ReferralStrings(errorInvalidEmail: 'Email invalido.')),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Get my link'));
+      await tester.pumpAndSettle();
+      expect(find.text('Email invalido.'), findsOneWidget);
+    });
+
+    testWidgets('the copy notices use their overrides', (tester) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await pumpJoined(tester, const ReferralStrings(copiedNotice: 'Codigo copiado', linkCopiedNotice: 'Link copiado'));
+      await tester.tap(find.widgetWithText(TextButton, 'Copy').first);
+      await tester.pump();
+      expect(find.text('Codigo copiado'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+
+      await tester.tap(find.widgetWithText(TextButton, 'Copy').last);
+      await tester.pump();
+      expect(find.text('Link copiado'), findsOneWidget);
+      expect(copied, ['ABC123', 'https://insertaffiliate.link/abc']);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('the spinner carries the loading label', (tester) async {
+      await tester.pumpWidget(_screen(
+        _FakeSdk(loadDelay: const Duration(milliseconds: 50)),
+        const ReferAFriendOptions(strings: ReferralStrings(loading: 'A carregar...')),
+      ));
+      await tester.pump();
+      final spinner = tester.widget<CircularProgressIndicator>(find.byType(CircularProgressIndicator));
+      expect(spinner.semanticsLabel, 'A carregar...');
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a Short Code Only referrer shares a code, in the app\'s wording', (tester) async {
+      final shortCodeOnly = MyAffiliateDetails(
+        affiliateName: joined.affiliateName,
+        affiliateShortCode: joined.affiliateShortCode,
+        deeplinkUrl: 'ABC123',
+        referralTrigger: 'purchase',
+        referralCount: 0,
+        installCount: 0,
+        eventCount: 0,
+        purchaseCount: 0,
+        totalEarned: 0,
+        totalPaid: 0,
+        totalUnpaid: 0,
+        currency: 'USD',
+        dashboardUrl: '',
+      );
+      await tester.pumpWidget(_screen(
+        _FakeSdk(enrolled: true, details: shortCodeOnly),
+        const ReferAFriendOptions(strings: ReferralStrings(shareCodeButton: 'Partilhar o meu codigo')),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Partilhar o meu codigo'), findsOneWidget);
+      expect(find.text('Share my code'), findsNothing);
     });
   });
 }

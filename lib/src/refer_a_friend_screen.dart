@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../insert_affiliate_flutter_sdk.dart';
+import 'referral_strings.dart';
 import 'referrals.dart' show normaliseVerificationCode;
 
 /// Options for the drop-in "Refer a friend" screen.
@@ -37,6 +38,10 @@ class ReferAFriendOptions {
   final String? headline;
   final String? rewardText;
 
+  /// Wording for every label on the screen. Anything left out keeps the
+  /// English default.
+  final ReferralStrings strings;
+
   final String? fontFamily;
   final double cornerRadius;
 
@@ -52,6 +57,7 @@ class ReferAFriendOptions {
     this.primaryColor,
     this.headline,
     this.rewardText,
+    this.strings = const ReferralStrings(),
     this.fontFamily,
     this.cornerRadius = 12,
     this.onClose,
@@ -100,6 +106,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
 
   InsertAffiliateFlutterSDK get _sdk => widget.sdk;
   ReferAFriendOptions get _options => widget.options;
+  ReferralStrings get _strings => _options.strings;
 
   @override
   void initState() {
@@ -179,7 +186,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   Future<void> _verify() async {
     final code = normaliseVerificationCode(_codeController.text);
     if (code.length != 6) {
-      setState(() => _error = 'Enter the 6-digit code from the email.');
+      setState(() => _error = referralText(_strings.errorCodeIncomplete, 'Enter the 6-digit code from the email.'));
       return;
     }
     setState(() {
@@ -244,21 +251,24 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   String _messageFor(String? code, String? fallback) {
     switch (code) {
       case 'PROGRAM_DISABLED':
-        return 'Referrals are not available in this app right now.';
+        return referralText(_strings.errorProgramDisabled, 'Referrals are not available in this app right now.');
       case 'AFFILIATE_LIMIT_REACHED':
-        return 'The referral program is full right now. Please try again later.';
+        return referralText(
+            _strings.errorAffiliateLimitReached, 'The referral program is full right now. Please try again later.');
       case 'INVALID_CODE':
-        return 'That code is wrong or has expired. Check the email or send a new code.';
+        return referralText(
+            _strings.errorInvalidCode, 'That code is wrong or has expired. Check the email or send a new code.');
       case 'TOO_MANY_CODES':
-        return 'Too many codes requested. Please wait a while and try again.';
+        return referralText(_strings.errorTooManyCodes, 'Too many codes requested. Please wait a while and try again.');
       case 'RATE_LIMITED':
-        return 'Too many attempts. Please wait a moment and try again.';
+        return referralText(_strings.errorRateLimited, 'Too many attempts. Please wait a moment and try again.');
       case 'INVALID_EMAIL':
-        return 'Please enter a valid email address.';
+        return referralText(_strings.errorInvalidEmail, 'Please enter a valid email address.');
       case 'NETWORK_ERROR':
-        return 'Could not connect. Check your connection and try again.';
+        return referralText(_strings.errorNetwork, 'Could not connect. Check your connection and try again.');
       default:
-        return fallback ?? 'Something went wrong. Please try again.';
+        // The server's own message, when it sent one, reads better than ours.
+        return fallback ?? referralText(_strings.errorServer, 'Something went wrong. Please try again.');
     }
   }
 
@@ -276,14 +286,27 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     return null;
   }
 
-  Future<void> _copy(String value, String label) async {
+  Future<void> _copy(String value, String notice) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
+    _showNotice(notice);
+  }
+
+  void _showNotice(String notice) {
     _noticeTimer?.cancel();
-    setState(() => _notice = '$label copied');
+    setState(() => _notice = notice);
     _noticeTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _notice = null);
     });
+  }
+
+  String get _codeCopiedNotice => referralText(_strings.copiedNotice, 'Code copied');
+
+  // Asks for another code and says so, since the screen otherwise looks unchanged.
+  Future<void> _resend() async {
+    await _enrol();
+    if (!mounted || _state != _ScreenState.codeStep || _error != null) return;
+    _showNotice(referralText(_strings.codeResentNotice, 'We sent a new code. Check your email.'));
   }
 
   Future<void> _share() async {
@@ -303,20 +326,23 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     try {
       await SharePlus.instance.share(ShareParams(text: text, sharePositionOrigin: origin));
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not open the share sheet. Copy your link instead.');
+      if (mounted) {
+        setState(() => _error =
+            referralText(_strings.errorShareFailed, 'Could not open the share sheet. Copy your link instead.'));
+      }
     }
   }
 
   Future<void> _redeem(ReferralRewardCode reward) async {
     final uri = Uri.tryParse(reward.redeemUrl);
     final opened = uri != null && reward.redeemUrl.isNotEmpty && await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened) await _copy(reward.code, 'Code');
+    if (!opened) await _copy(reward.code, _codeCopiedNotice);
   }
 
   Future<void> _openDashboard(String url) async {
     final uri = Uri.tryParse(url);
     final opened = uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened) await _copy(url, 'Dashboard link');
+    if (!opened) await _copy(url, referralText(_strings.dashboardCopiedNotice, 'Dashboard link copied'));
   }
 
   @override
@@ -402,7 +428,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
             Expanded(child: Text(_headline, style: theme.textTheme.headlineSmall)),
             IconButton(
               icon: const Icon(Icons.close),
-              tooltip: 'Close',
+              tooltip: referralText(_strings.closeButton, 'Close'),
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           ],
@@ -418,12 +444,22 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
   List<Widget> _body(ThemeData theme, BorderRadius radius) {
     switch (_state) {
       case _ScreenState.loading:
-        return const [Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))];
+        return [
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Center(
+              child: CircularProgressIndicator(semanticsLabel: referralText(_strings.loading, 'Loading...')),
+            ),
+          ),
+        ];
       case _ScreenState.loadError:
         return [
           _errorText(theme),
           const SizedBox(height: 12),
-          ElevatedButton(onPressed: _load, child: const Text('Try again')),
+          ElevatedButton(
+            onPressed: _load,
+            child: Text(referralText(_strings.tryAgainButton, 'Try again')),
+          ),
         ];
       case _ScreenState.notEnrolled:
         return _notEnrolled(theme);
@@ -455,32 +491,36 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
 
   List<Widget> _notEnrolled(ThemeData theme) {
     return [
-      Text('Get your own link to share with friends.', style: theme.textTheme.bodyMedium),
+      Text(referralText(_strings.joinIntro, 'Get your own link to share with friends.'),
+          style: theme.textTheme.bodyMedium),
       const SizedBox(height: 16),
       TextField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
         autocorrect: false,
         textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(labelText: 'Email'),
+        decoration: InputDecoration(labelText: referralText(_strings.emailLabel, 'Email')),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _nameController,
         textCapitalization: TextCapitalization.words,
         textInputAction: TextInputAction.done,
-        decoration: const InputDecoration(labelText: 'Name'),
+        decoration: InputDecoration(labelText: referralText(_strings.nameLabel, 'Name')),
       ),
       const SizedBox(height: 16),
       _errorText(theme),
-      _primaryButton('Get my link', _enrol),
+      _primaryButton(referralText(_strings.joinButton, 'Get my link'), _enrol),
     ];
   }
 
   List<Widget> _codeStep(ThemeData theme) {
     return [
       Text(
-        'We emailed a 6-digit code to ${_emailController.text.trim()}. Enter it below to connect.',
+        fillReferralPlaceholders(
+          referralText(_strings.codeSentNotice, 'We emailed a 6-digit code to {email}. Enter it below to connect.'),
+          {'email': _emailController.text.trim()},
+        ),
         style: theme.textTheme.bodyMedium,
       ),
       const SizedBox(height: 16),
@@ -491,7 +531,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
         autofillHints: const [AutofillHints.oneTimeCode],
         // Any script's digits (Arabic-Indic, fullwidth, ...) become 0-9; spaces and other characters are dropped.
         inputFormatters: [_verificationCodeFormatter],
-        decoration: const InputDecoration(labelText: 'Code', counterText: ''),
+        decoration: InputDecoration(labelText: referralText(_strings.codeLabel, 'Code'), counterText: ''),
       ),
       const SizedBox(height: 16),
       _errorText(theme),
@@ -499,10 +539,14 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       ValueListenableBuilder<TextEditingValue>(
         valueListenable: _codeController,
         builder: (context, value, _) =>
-            _primaryButton('Verify', normaliseVerificationCode(value.text).length == 6 ? _verify : null),
+            _primaryButton(referralText(_strings.verifyButton, 'Verify'),
+                normaliseVerificationCode(value.text).length == 6 ? _verify : null),
       ),
       const SizedBox(height: 8),
-      TextButton(onPressed: _busy ? null : _enrol, child: const Text('Send a new code')),
+      TextButton(
+        onPressed: _busy ? null : _resend,
+        child: Text(referralText(_strings.resendButton, 'Send a new code')),
+      ),
       TextButton(
         onPressed: _busy
             ? null
@@ -511,7 +555,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
                   _error = null;
                   _codeController.clear();
                 }),
-        child: const Text('Use a different email'),
+        child: Text(referralText(_strings.differentEmailButton, 'Use a different email')),
       ),
     ];
   }
@@ -538,7 +582,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Your code', style: theme.textTheme.labelMedium),
+                  Text(referralText(_strings.codeLabelTitle, 'Your code'), style: theme.textTheme.labelMedium),
                   SelectableText(
                     details.affiliateShortCode,
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.5),
@@ -546,7 +590,10 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
                 ],
               ),
             ),
-            TextButton(onPressed: () => _copy(details.affiliateShortCode, 'Code'), child: const Text('Copy')),
+            TextButton(
+              onPressed: () => _copy(details.affiliateShortCode, _codeCopiedNotice),
+              child: Text(referralText(_strings.copyButton, 'Copy')),
+            ),
           ],
         ),
       ),
@@ -560,7 +607,11 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
               Expanded(
                 child: Text(details.deeplinkUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-              TextButton(onPressed: () => _copy(details.deeplinkUrl, 'Link'), child: const Text('Copy')),
+              TextButton(
+                onPressed: () =>
+                    _copy(details.deeplinkUrl, referralText(_strings.linkCopiedNotice, 'Link copied')),
+                child: Text(referralText(_strings.copyButton, 'Copy')),
+              ),
             ],
           ),
         ),
@@ -571,27 +622,38 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
         key: _shareButtonKey,
         onPressed: _share,
         icon: const Icon(Icons.ios_share),
-        label: Text(hasLink ? 'Share my link' : 'Share my code'),
+        label: Text(hasLink
+            ? referralText(_strings.shareButton, 'Share my link')
+            : referralText(_strings.shareCodeButton, 'Share my code')),
       ),
       const SizedBox(height: 16),
       Row(
         children: [
-          Expanded(child: _stat(theme, 'Referrals', '${details.referralCount}')),
+          Expanded(
+            child: _stat(
+                theme, referralText(_strings.referralsLabel, 'Referrals'), '${details.referralCount}'),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: _stat(theme, 'Earned', formatReferralAmount(details.totalEarned, details.currency))),
+          Expanded(
+            child: _stat(theme, referralText(_strings.earnedLabel, 'Earned'),
+                formatReferralAmount(details.totalEarned, details.currency)),
+          ),
         ],
       ),
       if (showPremium) ...[
         const SizedBox(height: 12),
         Text(
-          'Free premium until ${MaterialLocalizations.of(context).formatMediumDate(premiumUntil.toLocal())}',
+          fillReferralPlaceholders(
+            referralText(_strings.premiumUntil, 'Free premium until {date}'),
+            {'date': MaterialLocalizations.of(context).formatMediumDate(premiumUntil.toLocal())},
+          ),
           style: theme.textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),
       ],
       if (rewardCodes.isNotEmpty) ...[
         const SizedBox(height: 16),
-        Text('Your rewards', style: theme.textTheme.titleMedium),
+        Text(referralText(_strings.rewardsHeading, 'Your rewards'), style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         for (final reward in rewardCodes)
           Padding(
@@ -604,7 +666,10 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
                   Expanded(
                     child: SelectableText(reward.code, style: theme.textTheme.titleMedium?.copyWith(letterSpacing: 1)),
                   ),
-                  TextButton(onPressed: () => _redeem(reward), child: const Text('Redeem')),
+                  TextButton(
+                    onPressed: () => _redeem(reward),
+                    child: Text(referralText(_strings.redeemButton, 'Redeem')),
+                  ),
                 ],
               ),
             ),
@@ -614,7 +679,7 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
         const SizedBox(height: 8),
         TextButton(
           onPressed: () => _openDashboard(details.dashboardUrl),
-          child: const Text('Open my dashboard'),
+          child: Text(referralText(_strings.dashboardLink, 'Open my dashboard')),
         ),
       ],
     ];

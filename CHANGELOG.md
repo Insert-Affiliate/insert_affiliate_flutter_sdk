@@ -1,3 +1,15 @@
+## Unreleased
+- In-app referrals (Refer a friend): turn your app's users into affiliates from inside the app. Needs the matching Insert Affiliate API release and the program switched on in the dashboard.
+  - `createAffiliateForUser(email, name)` enrols the user. When the email is already an affiliate, a 6-digit code is emailed and `verifyAffiliateCode(email, code)` connects this device (also after a reinstall or on a new phone). The code may be typed in any script's digits.
+  - `getMyAffiliateDetails()` returns the referrer's code, link, `referralCount`, earnings, `rewardsGranted`, `premiumUntil` and `rewardCodes`. Also `isUserAnAffiliate()`, `signOutAffiliate()`, `getReferralProgramConfig()` and `shareReferralLink()`.
+  - `showReferAFriend(context)` presents the drop-in "Refer a friend" bottom sheet (`ReferAFriendScreen`): join form, email code step, code and link with Copy and Share, referral count, earnings, "Free premium until ..." and reward codes with Redeem. Copy and colour come from `ReferAFriendOptions`, then the dashboard.
+  - Automatic referrer rewards (RevenueCat, Adapty, App Store offer codes, Google Play): pass `appUserId` and/or `playPurchaseToken` to `createAffiliateForUser` / `verifyAffiliateCode` / `ReferAFriendOptions`, or later to `setReferrerAccount`.
+  - The device keeps a referrer token in the app's shared preferences. It is cleared on `signOutAffiliate()` or when the server rejects it (`INVALID_TOKEN`, `AFFILIATE_NOT_FOUND`), and kept on network and other errors.
+  - Every label on the screen can be translated or reworded: `ReferAFriendOptions(strings: ReferralStrings(...))`. Each field is optional and falls back to the English default, and `{email}` and `{date}` are filled in when the screen shows the text. `headline` and `rewardText` stay where they are. "Send a new code" now confirms that another code was sent.
+- New dependency: `share_plus` (`>=11.0.0 <13.0.0`) for the system share sheet.
+- In-app referrals: enrol, verify and `setReferrerAccount` send the phone's OS (`os`: `ios` or `android`) so the server can pick the referrer's reward store. Left out on web and desktop.
+- In-app referrals: `ReferralRewardCode` has `store` (`app_store` or `google_play`, missing means `app_store`) with `isAppStore` / `isGooglePlay`. The Refer a friend screen lists App Store codes on iOS and Google Play promo codes on Android (all codes elsewhere), via the new `rewardCodesForPlatform`.
+
 ## 1.7.0
 Add short code usage tracking
 

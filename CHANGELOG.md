@@ -1,3 +1,6 @@
+## 1.10.1
+- Maintenance release; verifies automated publishing to pub.dev from CI (OIDC).
+
 ## 1.10.0
 - In-app referrals (Refer a friend): turn your app's users into affiliates from inside the app. Needs the matching Insert Affiliate API release and the program switched on in the dashboard.
   - `createAffiliateForUser(email, name)` enrols the user. When the email is already an affiliate, a 6-digit code is emailed and `verifyAffiliateCode(email, code)` connects this device (also after a reinstall or on a new phone). The code may be typed in any script's digits.

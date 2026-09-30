@@ -1,0 +1,17 @@
+# Publishes to pub.dev via OIDC trusted publishing (no stored token).
+# Trigger: push a version tag like v1.10.0 that matches the pubspec version.
+# One-time setup on pub.dev: package -> Admin -> Automated publishing ->
+# enable "Publishing from GitHub Actions", repository
+# Insert-Affiliate/insert_affiliate_flutter_sdk, tag pattern v{{version}}.
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    permissions:
+      id-token: write # required for pub.dev OIDC authentication
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1

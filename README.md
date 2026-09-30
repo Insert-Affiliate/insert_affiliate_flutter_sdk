@@ -651,7 +651,7 @@ _branchStreamSubscription = FlutterBranchSdk.listSession().listen((data) {
 });
 ```
 
-📖 **[View complete Branch.io integration guide →](docs/deep-linking-branch.md)**
+📖 **[View complete Branch.io integration guide →](doc/deep-linking-branch.md)**
 
 </details>
 
@@ -684,7 +684,7 @@ _appsflyerSdk.onDeepLinking((deepLinkResult) async {
 });
 ```
 
-📖 **[View complete AppsFlyer integration guide →](docs/deep-linking-appsflyer.md)**
+📖 **[View complete AppsFlyer integration guide →](doc/deep-linking-appsflyer.md)**
 
 </details>
 
@@ -836,7 +836,7 @@ final dynamicProductId = offerCode != null
     : baseProductId;
 ```
 
-📖 **[View complete Dynamic Offer Codes guide →](docs/dynamic-offer-codes.md)**
+📖 **[View complete Dynamic Offer Codes guide →](doc/dynamic-offer-codes.md)**
 
 </details>
 
@@ -1168,9 +1168,9 @@ insertAffiliateSdk = InsertAffiliateFlutterSDK(
 ## 📚 Support
 
 - **Documentation**: [docs.insertaffiliate.com](https://docs.insertaffiliate.com)
-- **Branch.io Guide**: [docs/deep-linking-branch.md](docs/deep-linking-branch.md)
-- **AppsFlyer Guide**: [docs/deep-linking-appsflyer.md](docs/deep-linking-appsflyer.md)
-- **Offer Codes Guide**: [docs/dynamic-offer-codes.md](docs/dynamic-offer-codes.md)
+- **Branch.io Guide**: [doc/deep-linking-branch.md](doc/deep-linking-branch.md)
+- **AppsFlyer Guide**: [doc/deep-linking-appsflyer.md](doc/deep-linking-appsflyer.md)
+- **Offer Codes Guide**: [doc/dynamic-offer-codes.md](doc/dynamic-offer-codes.md)
 - **Dashboard**: [app.insertaffiliate.com](https://app.insertaffiliate.com)
 - **Issues**: [GitHub Issues](https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk/issues)
 

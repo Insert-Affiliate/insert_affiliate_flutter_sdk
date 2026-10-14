@@ -1082,7 +1082,7 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
         verboseLog('Warning: URL company code ($urlCompanyCode) doesn\'t match initialized company code ($activeCompanyCode)');
       }
 
-      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
+      await _validateAndStoreShortCode(shortCode.toUpperCase(), urlCompanyCode, Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
       return true;
     } catch (error) {
       print('[Insert Affiliate] Error handling universal link: $error');
@@ -1113,12 +1113,92 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       }
 
       verboseLog('Custom domain universal link detected - Short code: $shortCode');
-      await storeInsertAffiliateIdentifier(link: shortCode.toUpperCase(), source: Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
+      await _validateAndStoreShortCode(shortCode.toUpperCase(), activeCompanyCode, Platform.isAndroid ? AffiliateAssociationSource.appLink : AffiliateAssociationSource.universalLink);
       return true;
     } catch (error) {
       print('[Insert Affiliate] Error handling custom domain universal link: $error');
       return false;
     }
+  }
+
+  /// Asks the backend to validate a short code from a link, then stores the server's user code.
+  /// An explicit "not found" (404, or an error in the body) discards the code. When the server can't
+  /// confirm or reject it (network failure, server error, unreadable response), the code from the
+  /// link is stored rather than losing the attribution.
+  Future<void> _validateAndStoreShortCode(String shortCode, String urlCompanyCode, AffiliateAssociationSource source) async {
+    // Storing the same code is a no-op, so skip the call (it counts as a click)
+    final prefs = await SharedPreferences.getInstance();
+    final existingLink = prefs.getString(_referrerLinkKey);
+    if (existingLink != null && existingLink.toUpperCase() == shortCode) {
+      verboseLog('Short code $shortCode is already stored, skipping lookup');
+      return;
+    }
+
+    Future<void> storeUnverified(String reason) async {
+      print('[Insert Affiliate] $reason. Storing short code $shortCode from the link without server confirmation.');
+      await storeInsertAffiliateIdentifier(link: shortCode, source: source);
+    }
+
+    final urlString = 'https://insertaffiliate.link/V1/getDeepLinkData/${Uri.encodeComponent(urlCompanyCode)}/${Uri.encodeComponent(shortCode)}';
+    verboseLog('Fetching deep link data from: $urlString');
+
+    final http.Response response;
+    try {
+      response = await http.get(
+        Uri.parse(urlString),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+    } catch (error) {
+      verboseLog('Error fetching deep link data: $error');
+      await storeUnverified('Could not reach the server');
+      return;
+    }
+
+    verboseLog('Deep link API response status: ${response.statusCode}');
+
+    if (response.statusCode == 404) {
+      print('[Insert Affiliate] The short code $shortCode was not found for company $urlCompanyCode. Not storing it.');
+      return;
+    }
+    if (response.statusCode != 200) {
+      verboseLog('API Error (${response.statusCode}): ${response.body}');
+      await storeUnverified('The server could not confirm the short code');
+      return;
+    }
+    if (response.body.isEmpty) {
+      await storeUnverified('The server returned no data');
+      return;
+    }
+
+    final Object? body;
+    try {
+      body = jsonDecode(response.body);
+    } catch (error) {
+      verboseLog('Failed to parse deep link data: $error');
+      await storeUnverified('The server response could not be parsed');
+      return;
+    }
+
+    if (body is! Map<String, dynamic>) {
+      await storeUnverified('The server response was not valid');
+      return;
+    }
+
+    if (body['error'] is String) {
+      print('[Insert Affiliate] API returned error: ${body['error']}. The short code $shortCode was not found. Not storing it.');
+      return;
+    }
+
+    final data = body['data'];
+    final deepLink = data is Map ? data['deepLink'] : null;
+    final userCode = deepLink is Map ? deepLink['userCode'] : null;
+    if (userCode is! String || userCode.isEmpty) {
+      await storeUnverified('The server response did not include a user code');
+      return;
+    }
+
+    verboseLog('User code extracted: $userCode');
+    await storeInsertAffiliateIdentifier(link: userCode, source: source);
   }
 
   // MARK: Android Deep Link Handler

@@ -1,3 +1,6 @@
+## 1.10.2
+- Package metadata: homepage now points to https://insertaffiliate.com.
+
 ## 1.10.1
 - Maintenance release; verifies automated publishing to pub.dev from CI (OIDC).
 

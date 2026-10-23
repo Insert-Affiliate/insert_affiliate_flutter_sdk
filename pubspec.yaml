@@ -1,7 +1,7 @@
 name: insert_affiliate_flutter_sdk
 description: A Flutter SDK for integrating affiliate tracking and in-app purchases for the Insert Affiliate Platform.
-version: 1.10.1
-homepage: https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk
+version: 1.10.2
+homepage: https://insertaffiliate.com
 repository: https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk
 issue_tracker: https://github.com/Insert-Affiliate/insert_affiliate_flutter_sdk/issues
 

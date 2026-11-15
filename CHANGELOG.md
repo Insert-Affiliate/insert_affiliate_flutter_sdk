@@ -1,3 +1,6 @@
+## 1.11.0
+- App Store Direct: `returnUserAccountTokenAndStoreExpectedTransaction(overrideUUID: ...)` lets an app that already sets its own `appAccountToken` keep using it. The value must be a valid UUID and is reused by later calls. Calls without it behave as before.
+
 ## 1.10.2
 - Package metadata: homepage now points to https://insertaffiliate.com.
 

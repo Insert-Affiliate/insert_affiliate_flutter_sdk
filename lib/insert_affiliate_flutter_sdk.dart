@@ -634,16 +634,14 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
     }
   }
 
-  Future<String?> returnUserAccountTokenAndStoreExpectedTransaction() async {
+  Future<String?> returnUserAccountTokenAndStoreExpectedTransaction({String? overrideUUID}) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Step 1: Get or create user account token
-      String? userAccountToken = prefs.getString('user_account_token');
-      if (userAccountToken == null) {
-        userAccountToken = _generateUUID();
-        await prefs.setString('user_account_token', userAccountToken);
+      if (overrideUUID != null && !_isValidUUID(overrideUUID)) {
+        errorLog("[Insert Affiliate] Invalid UUID passed to overrideUUID: $overrideUUID", "error");
+        return null;
       }
+
+      final userAccountToken = await _resolveUserAccountToken(overrideUUID);
 
       // Step 2: Get insert affiliate identifier (referrer + user ID)
       final shortCode = await returnInsertAffiliateIdentifier();
@@ -680,6 +678,18 @@ class InsertAffiliateFlutterSDK extends ChangeNotifier {
       errorLog("[Insert Affiliate] Error storing expected transaction: $error", "error");
       return null;
     }
+  }
+
+  Future<String> _resolveUserAccountToken(String? overrideUUID) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userAccountToken = overrideUUID ?? prefs.getString('user_account_token') ?? _generateUUID();
+    await prefs.setString('user_account_token', userAccountToken);
+    return userAccountToken;
+  }
+
+  // Apple only reports an appAccountToken back in its notifications when it is a UUID.
+  bool _isValidUUID(String value) {
+    return RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(value);
   }
 
   String _generateUUID() {

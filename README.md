@@ -399,6 +399,10 @@ void _buySubscription(ProductDetails product) async {
   String? appAccountToken;
   if (Platform.isIOS) {
     appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction();
+    // Optional override: use your own UUID as the appAccountToken
+    // appAccountToken = await insertAffiliateSdk.returnUserAccountTokenAndStoreExpectedTransaction(
+    //   overrideUUID: "YOUR_OWN_UUID",
+    // );
   }
 
   final purchaseParam = PurchaseParam(
@@ -409,6 +413,8 @@ void _buySubscription(ProductDetails product) async {
   _iap.buyNonConsumable(purchaseParam: purchaseParam);
 }
 ```
+
+**Already set your own `appAccountToken`?** Pass it as `overrideUUID` and keep sending the same value to StoreKit. It must be a valid UUID. If no affiliate is stored for the user, the call returns `null` and nothing is registered, so fall back to your own UUID when building the purchase.
 
 ✅ **App Store Direct setup complete!**
 

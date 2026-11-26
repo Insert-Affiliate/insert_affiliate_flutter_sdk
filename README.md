@@ -977,7 +977,7 @@ await insertAffiliateSdk.showReferAFriend(
 );
 ```
 
-The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code, link, Copy and Share buttons, referral count, amount earned and an "Open my dashboard" link. When the referrer has been granted rewards it also shows "Free premium until {date}" (while that date is in the future) a "Your rewards" list of the codes this phone can redeem, each with a Redeem button: App Store offer codes on iOS, Google Play promo codes on Android. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
+The screen handles every step: loading, the "Get my link" form, the 6-digit email code when the email is already an affiliate, and the enrolled view with the code (shown unless the dashboard setting hides it, and always shown when there is no web link, as with Short Code Only), the link with its own Copy button, a Share button, the referral count, "Earned" (only for cash programs), "Days earned" (only for automatic-premium programs) and an "Open my dashboard" link. When the referrer has been granted rewards it also shows "Free premium until {date}" (while that date is in the future) a "Your rewards" list of the codes this phone can redeem, each with a Redeem button: App Store offer codes on iOS, Google Play promo codes on Android. You can also push or embed `ReferAFriendScreen(sdk: insertAffiliateSdk, options: ...)` yourself.
 
 Headline, reward text and colour come from your options first, then your dashboard settings, then the defaults ("Refer a friend", `#6A0DAD`), so you can change the wording without an app release. `fontFamily` and `cornerRadius` are also available.
 
@@ -1022,6 +1022,9 @@ await insertAffiliateSdk.showReferAFriend(
 | `shareCodeButton` | Share my code (Short Code Only apps) |
 | `referralsLabel` | Referrals |
 | `earnedLabel` | Earned |
+| `daysEarnedLabel` | Days earned |
+| `dayUnit` | {count} day (exactly 1 day) |
+| `daysUnit` | {count} days (any other number) |
 | `premiumUntil` | Free premium until {date} |
 | `rewardsHeading` | Your rewards |
 | `redeemButton` | Redeem |
@@ -1091,10 +1094,10 @@ await insertAffiliateSdk.signOutAffiliate(); // call when your user logs out
 | `createAffiliateForUser(email, name, {appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `created`, `verificationRequired` or `error` |
 | `verifyAffiliateCode(email, code, {name, appUserId, playPurchaseToken})` | `AffiliateEnrolmentResult` with status `connected`, `created` or `error` |
 | `setReferrerAccount({appUserId, playPurchaseToken})` | `bool`, false when not connected or the request fails |
-| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl`, `rewardsGranted`, `premiumUntil` (`DateTime?`), `rewardCodes` (`List<ReferralRewardCode>` with `code`, `redeemUrl`, `store` (`'app_store'` or `'google_play'`), `isAppStore`, `isGooglePlay`, `grantedAt`) |
+| `getMyAffiliateDetails()` | `MyAffiliateDetails?`: name, short code, link, `referralCount`, `installCount`, `eventCount`, `purchaseCount`, `totalEarned`, `totalPaid`, `totalUnpaid`, `currency`, `dashboardUrl`, `rewardDaysEarned` (free-premium days granted automatically), `earnedDisplay` (`cash` and `days` flags for which earnings to show; older servers: cash only), `rewardsGranted`, `premiumUntil` (`DateTime?`), `rewardCodes` (`List<ReferralRewardCode>` with `code`, `redeemUrl`, `store` (`'app_store'` or `'google_play'`), `isAppStore`, `isGooglePlay`, `grantedAt`) |
 | `isUserAnAffiliate()` | `bool` |
 | `signOutAffiliate()` | clears this device's referrer connection |
-| `getReferralProgramConfig()` | `ReferralProgramConfig?`: `enabled`, `companyName`, `referralTrigger`, `headline`, `rewardText`, `primaryColor` |
+| `getReferralProgramConfig()` | `ReferralProgramConfig?`: `enabled`, `companyName`, `referralTrigger`, `headline`, `rewardText`, `primaryColor`, `showCode` (whether the screen shows the short code; the drop-in screen always shows it when there is no web link) |
 | `shareReferralLink({message, sharePositionOrigin})` | `bool`, false when not connected |
 | `showReferAFriend(context, {options})` | shows the drop-in screen |
 
@@ -1114,7 +1117,7 @@ Error codes: `PROGRAM_DISABLED`, `AFFILIATE_LIMIT_REACHED`, `INVALID_EMAIL`, `IN
 2. `isUserAnAffiliate()` to see whether this device is already connected, without a network call.
 3. **Not enrolled:** `createAffiliateForUser(email, name)`. `status` is `created` (connected, `result.affiliate` has the code and link), `verificationRequired`, or `error`.
 4. **Code needed:** `verifyAffiliateCode(email, code)` with the 6-digit code from the email. Call `createAffiliateForUser` again to send a new code, and go back to step 3 for a different email. Digits typed in any script are accepted.
-5. **Enrolled:** `getMyAffiliateDetails()` for the code, link, `referralCount`, earnings and `dashboardUrl`.
+5. **Enrolled:** `getMyAffiliateDetails()` for the code, link, `referralCount`, earnings and `dashboardUrl`. Show the code only when the config's `showCode` is true (or there is no web link). Show `totalEarned` only when `earnedDisplay.cash` is true and `rewardDaysEarned` only when `earnedDisplay.days` is true.
 6. **Rewards:** on the same object, `rewardsGranted`, `premiumUntil` and `rewardCodes` (each with `code`, `redeemUrl`, `store`, `grantedAt`). `rewardCodesForPlatform(codes, platform: defaultTargetPlatform, isWeb: kIsWeb)` keeps the ones this phone can redeem, and `buildReferralShareText(...)` builds the same share text the screen uses.
 7. **Sharing:** `shareReferralLink()` for the system share sheet, or your own UI around the link and code.
 8. **Accounts and sign out:** `setReferrerAccount(...)` when the user subscribes or logs in, `signOutAffiliate()` when they log out.

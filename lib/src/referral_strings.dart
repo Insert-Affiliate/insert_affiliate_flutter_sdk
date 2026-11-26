@@ -76,6 +76,15 @@ class ReferralStrings {
   /// The earnings stat ("Earned").
   final String? earnedLabel;
 
+  /// The free-premium days stat ("Days earned").
+  final String? daysEarnedLabel;
+
+  /// One day in that stat, with `{count}` ("{count} day").
+  final String? dayUnit;
+
+  /// Any other number of days in that stat, with `{count}` ("{count} days").
+  final String? daysUnit;
+
   /// Free premium from referral rewards, with `{date}`
   /// ("Free premium until {date}").
   final String? premiumUntil;
@@ -160,6 +169,9 @@ class ReferralStrings {
     this.shareCodeButton,
     this.referralsLabel,
     this.earnedLabel,
+    this.daysEarnedLabel,
+    this.dayUnit,
+    this.daysUnit,
     this.premiumUntil,
     this.rewardsHeading,
     this.redeemButton,

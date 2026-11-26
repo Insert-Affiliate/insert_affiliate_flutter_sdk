@@ -245,6 +245,9 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       totalUnpaid: 0,
       currency: 'USD',
       dashboardUrl: '',
+      rewardDaysEarned: 0,
+      // No stats to show, so no earnings: not a made-up $0.00.
+      earnedDisplay: const ReferralEarnedDisplay(cash: false),
     );
   }
 
@@ -571,34 +574,46 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
       color: theme.colorScheme.primary.withValues(alpha: 0.08),
       borderRadius: radius,
     );
+    // Without a link the code is all there is to share, so it stays visible.
+    final showCode = (_config?.showCode ?? true) || !hasLink;
+    final earned = details.earnedDisplay;
+    final stats = [
+      _stat(theme, referralText(_strings.referralsLabel, 'Referrals'), '${details.referralCount}'),
+      if (earned.cash)
+        _stat(theme, referralText(_strings.earnedLabel, 'Earned'),
+            formatReferralAmount(details.totalEarned, details.currency)),
+      if (earned.days)
+        _stat(theme, referralText(_strings.daysEarnedLabel, 'Days earned'), _daysText(details.rewardDaysEarned)),
+    ];
 
     return [
-      Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        decoration: boxDecoration,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(referralText(_strings.codeLabelTitle, 'Your code'), style: theme.textTheme.labelMedium),
-                  SelectableText(
-                    details.affiliateShortCode,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                  ),
-                ],
+      if (showCode)
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          decoration: boxDecoration,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(referralText(_strings.codeLabelTitle, 'Your code'), style: theme.textTheme.labelMedium),
+                    SelectableText(
+                      details.affiliateShortCode,
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: () => _copy(details.affiliateShortCode, _codeCopiedNotice),
-              child: Text(referralText(_strings.copyButton, 'Copy')),
-            ),
-          ],
+              TextButton(
+                onPressed: () => _copy(details.affiliateShortCode, _codeCopiedNotice),
+                child: Text(referralText(_strings.copyButton, 'Copy')),
+              ),
+            ],
+          ),
         ),
-      ),
       if (hasLink) ...[
-        const SizedBox(height: 8),
+        if (showCode) const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
           decoration: boxDecoration,
@@ -627,18 +642,17 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
             : referralText(_strings.shareCodeButton, 'Share my code')),
       ),
       const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: _stat(
-                theme, referralText(_strings.referralsLabel, 'Referrals'), '${details.referralCount}'),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _stat(theme, referralText(_strings.earnedLabel, 'Earned'),
-                formatReferralAmount(details.totalEarned, details.currency)),
-          ),
-        ],
+      // Equal widths and, with IntrinsicHeight, equal heights even when a label wraps.
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < stats.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: stats[i]),
+            ],
+          ],
+        ),
       ),
       if (showPremium) ...[
         const SizedBox(height: 12),
@@ -685,6 +699,14 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
     ];
   }
 
+  // "1 day", "90 days": the app's wording, or ours.
+  String _daysText(int days) => fillReferralPlaceholders(
+        days == 1
+            ? referralText(_strings.dayUnit, '{count} day')
+            : referralText(_strings.daysUnit, '{count} days'),
+        {'count': '$days'},
+      );
+
   Widget _stat(ThemeData theme, String label, String value) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -693,10 +715,14 @@ class _ReferAFriendScreenState extends State<ReferAFriendScreen> {
         borderRadius: BorderRadius.circular(_options.cornerRadius),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: theme.textTheme.titleLarge),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, maxLines: 1, textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: theme.textTheme.labelMedium),
+          Text(label, textAlign: TextAlign.center, style: theme.textTheme.labelMedium),
         ],
       ),
     );

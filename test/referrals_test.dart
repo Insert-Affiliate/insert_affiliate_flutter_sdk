@@ -31,9 +31,10 @@ final _otherAuthErrors = <http.Response Function()>[
 
 /// Records the referral calls the drop-in screen makes.
 class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
-  _FakeSdk({this.enrolled = false, this.details = _details, this.loadDelay = Duration.zero});
+  _FakeSdk({this.enrolled = false, this.details = _details, this.config, this.loadDelay = Duration.zero});
 
   final bool enrolled;
+  final ReferralProgramConfig? config;
   /// Holds the screen in its loading state for as long as a test needs.
   final Duration loadDelay;
   final MyAffiliateDetails details;
@@ -59,7 +60,7 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   @override
   Future<ReferralProgramConfig?> getReferralProgramConfig() async {
     await Future<void>.delayed(loadDelay);
-    return null;
+    return config;
   }
 
   @override
@@ -90,6 +91,22 @@ class _FakeSdk extends Fake implements InsertAffiliateFlutterSDK {
   Future<bool> setReferrerAccount({String? appUserId, String? playPurchaseToken}) async {
     calls.add({'method': 'setReferrerAccount', 'appUserId': appUserId, 'playPurchaseToken': playPurchaseToken});
     return true;
+  }
+}
+
+/// Joining works but the stats call then fails (`getMyAffiliateDetails` returns null).
+class _CreatedWithoutStatsSdk extends _FakeSdk {
+  @override
+  Future<AffiliateEnrolmentResult> createAffiliateForUser(String email, String name,
+      {String? appUserId, String? playPurchaseToken}) async {
+    return AffiliateEnrolmentResult.fromJson({
+      'status': 'created',
+      'affiliate': {
+        'affiliateName': 'Jane',
+        'affiliateShortCode': 'ABC123',
+        'deeplinkurl': 'https://insertaffiliate.link/abc',
+      },
+    });
   }
 }
 
@@ -193,6 +210,29 @@ void main() {
       expect(details.rewardsGranted, 0);
       expect(details.premiumUntil, isNull);
       expect(details.rewardCodes, isEmpty);
+      // Older servers: cash only, no days.
+      expect(details.rewardDaysEarned, 0);
+      expect(details.earnedDisplay.cash, isTrue);
+      expect(details.earnedDisplay.days, isFalse);
+    });
+
+    test('MyAffiliateDetails.fromJson reads rewardDaysEarned and earnedDisplay', () {
+      final details = MyAffiliateDetails.fromJson({
+        'rewardDaysEarned': 90,
+        'earnedDisplay': {'cash': false, 'days': true},
+      });
+      expect(details.rewardDaysEarned, 90);
+      expect(details.earnedDisplay.cash, isFalse);
+      expect(details.earnedDisplay.days, isTrue);
+
+      final both = MyAffiliateDetails.fromJson({'earnedDisplay': {'cash': true, 'days': true}});
+      expect(both.earnedDisplay.cash, isTrue);
+      expect(both.earnedDisplay.days, isTrue);
+
+      final bad = MyAffiliateDetails.fromJson({'rewardDaysEarned': 'x', 'earnedDisplay': 'nope'});
+      expect(bad.rewardDaysEarned, 0);
+      expect(bad.earnedDisplay.cash, isTrue);
+      expect(bad.earnedDisplay.days, isFalse);
     });
 
     test('MyAffiliateDetails.fromJson reads rewards', () {
@@ -257,6 +297,12 @@ void main() {
       expect(config.rewardText, startsWith('Earn'));
       expect(config.primaryColor, '#112233');
       expect(ReferralProgramConfig.fromJson({}).enabled, isFalse);
+    });
+
+    test('ReferralProgramConfig.fromJson reads showCode, true when absent', () {
+      expect(ReferralProgramConfig.fromJson({}).showCode, isTrue);
+      expect(ReferralProgramConfig.fromJson({'showCode': true}).showCode, isTrue);
+      expect(ReferralProgramConfig.fromJson({'showCode': false}).showCode, isFalse);
     });
 
     test('AffiliateEnrolmentResult.fromJson maps statuses', () {
@@ -788,6 +834,202 @@ void main() {
       expect(find.text('APPLE1'), findsOneWidget);
       expect(find.text('PLAY1'), findsOneWidget);
       debugDefaultTargetPlatformOverride = null;
+    });
+  });
+
+  group('ReferAFriendScreen code and stats', () {
+    MyAffiliateDetails details({
+      int days = 0,
+      ReferralEarnedDisplay display = const ReferralEarnedDisplay(),
+      String deeplinkUrl = 'https://insertaffiliate.link/abc',
+    }) =>
+        MyAffiliateDetails(
+          affiliateName: 'Jane',
+          affiliateShortCode: 'ABC123',
+          deeplinkUrl: deeplinkUrl,
+          referralTrigger: 'purchase',
+          referralCount: 4,
+          installCount: 0,
+          eventCount: 0,
+          purchaseCount: 4,
+          totalEarned: 12.5,
+          totalPaid: 0,
+          totalUnpaid: 12.5,
+          currency: 'USD',
+          dashboardUrl: '',
+          rewardDaysEarned: days,
+          earnedDisplay: display,
+        );
+
+    ReferralProgramConfig config({bool showCode = true}) => ReferralProgramConfig(
+          enabled: true,
+          companyName: 'Velvet',
+          referralTrigger: 'purchase',
+          headline: '',
+          rewardText: '',
+          primaryColor: '',
+          showCode: showCode,
+        );
+
+    Future<void> pump(WidgetTester tester, MyAffiliateDetails details,
+        {ReferralProgramConfig? config, ReferralStrings strings = const ReferralStrings()}) async {
+      await tester.pumpWidget(
+          _screen(_FakeSdk(enrolled: true, details: details, config: config), ReferAFriendOptions(strings: strings)));
+      await tester.pumpAndSettle();
+    }
+
+    double statWidth(WidgetTester tester, String label) =>
+        tester.getSize(find.ancestor(of: find.text(label), matching: find.byType(Container)).first).width;
+
+    testWidgets('showCode false hides the code box; the link still copies', (tester) async {
+      final copied = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await pump(tester, details(), config: config(showCode: false));
+      expect(find.text('Your code'), findsNothing);
+      expect(find.text('ABC123'), findsNothing);
+      expect(find.text('https://insertaffiliate.link/abc'), findsOneWidget);
+      expect(find.text('Share my link'), findsOneWidget);
+      expect(find.text('Copy'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Copy'));
+      await tester.pump();
+      expect(copied, ['https://insertaffiliate.link/abc']);
+      expect(find.text('Link copied'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('the code shows when showCode is true or the config is missing', (tester) async {
+      await pump(tester, details(), config: config());
+      expect(find.text('ABC123'), findsOneWidget);
+      await pump(tester, details());
+      expect(find.text('ABC123'), findsOneWidget);
+    });
+
+    testWidgets('a Short Code Only referrer still sees the code they share', (tester) async {
+      await pump(tester, details(deeplinkUrl: 'ABC123'), config: config(showCode: false));
+      expect(find.text('ABC123'), findsOneWidget);
+      expect(find.text('Share my code'), findsOneWidget);
+    });
+
+    testWidgets('older servers show Referrals and cash Earned only', (tester) async {
+      await pump(tester, details());
+      expect(find.text('Referrals'), findsOneWidget);
+      expect(find.text('Earned'), findsOneWidget);
+      expect(find.text(r'$12.50'), findsOneWidget);
+      expect(find.text('Days earned'), findsNothing);
+    });
+
+    testWidgets('cash false hides Earned, with no \$0.00', (tester) async {
+      await pump(tester, details(display: const ReferralEarnedDisplay(cash: false)));
+      expect(find.text('Referrals'), findsOneWidget);
+      expect(find.text('Earned'), findsNothing);
+      expect(find.textContaining(r'$'), findsNothing);
+      expect(find.text('Days earned'), findsNothing);
+    });
+
+    testWidgets('days true adds Days earned, pluralised', (tester) async {
+      await pump(tester, details(days: 90, display: const ReferralEarnedDisplay(cash: false, days: true)));
+      expect(find.text('Earned'), findsNothing);
+      expect(find.text('Days earned'), findsOneWidget);
+      expect(find.text('90 days'), findsOneWidget);
+
+      await pump(tester, details(days: 1, display: const ReferralEarnedDisplay(cash: false, days: true)));
+      expect(find.text('1 day'), findsOneWidget);
+
+      await pump(tester, details(days: 0, display: const ReferralEarnedDisplay(cash: false, days: true)));
+      expect(find.text('0 days'), findsOneWidget);
+    });
+
+    testWidgets('the strip is 1, 2 or 3 equal-width columns', (tester) async {
+      await pump(tester, details(display: const ReferralEarnedDisplay(cash: false)));
+      final one = statWidth(tester, 'Referrals');
+
+      await pump(tester, details(days: 5, display: const ReferralEarnedDisplay(cash: true, days: false)));
+      final two = statWidth(tester, 'Referrals');
+      expect(statWidth(tester, 'Earned'), two);
+
+      await pump(tester, details(days: 5, display: const ReferralEarnedDisplay(cash: true, days: true)));
+      final three = statWidth(tester, 'Referrals');
+      expect(statWidth(tester, 'Earned'), three);
+      expect(statWidth(tester, 'Days earned'), three);
+      expect(find.text('5 days'), findsOneWidget);
+      expect(one, greaterThan(two));
+      expect(two, greaterThan(three));
+    });
+
+    testWidgets('long values and labels at 320px keep equal widths and heights, with no overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final big = MyAffiliateDetails(
+        affiliateName: 'Jane',
+        affiliateShortCode: 'ABC123',
+        deeplinkUrl: 'https://insertaffiliate.link/abc',
+        referralTrigger: 'purchase',
+        referralCount: 123456,
+        installCount: 0,
+        eventCount: 0,
+        purchaseCount: 0,
+        totalEarned: 123456.78,
+        totalPaid: 0,
+        totalUnpaid: 0,
+        currency: 'USD',
+        dashboardUrl: '',
+        rewardDaysEarned: 12345,
+        earnedDisplay: const ReferralEarnedDisplay(cash: true, days: true),
+      );
+      await pump(
+        tester,
+        big,
+        strings: const ReferralStrings(
+          referralsLabel: 'Amigos convidados',
+          earnedLabel: 'Total ganho em dinheiro',
+          daysEarnedLabel: 'Dias de premium ganhos',
+          daysUnit: '{count} dias',
+        ),
+      );
+      expect(tester.takeException(), isNull);
+
+      final labels = ['Amigos convidados', 'Total ganho em dinheiro', 'Dias de premium ganhos'];
+      final sizes = [
+        for (final label in labels)
+          tester.getSize(find.ancestor(of: find.text(label), matching: find.byType(Container)).first),
+      ];
+      expect(find.text(r'$123456.78'), findsOneWidget);
+      expect(find.text('12345 dias'), findsOneWidget);
+      expect(sizes.map((size) => size.width).toSet(), hasLength(1));
+      expect(sizes.map((size) => size.height).toSet(), hasLength(1));
+    });
+
+    testWidgets('when the stats call fails after joining, no earnings are shown', (tester) async {
+      await tester.pumpWidget(_screen(
+        _CreatedWithoutStatsSdk(),
+        const ReferAFriendOptions(email: 'jane@example.com'),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Get my link'));
+      await tester.pumpAndSettle();
+      expect(find.text('ABC123'), findsOneWidget);
+      expect(find.text('Referrals'), findsOneWidget);
+      expect(find.text('Earned'), findsNothing);
+      expect(find.text('Days earned'), findsNothing);
+      expect(find.textContaining(r'$'), findsNothing);
+    });
+
+    testWidgets('the day strings can be translated', (tester) async {
+      const strings = ReferralStrings(daysEarnedLabel: 'Dias ganhos', dayUnit: '{count} dia', daysUnit: '{count} dias');
+      const display = ReferralEarnedDisplay(cash: false, days: true);
+      await pump(tester, details(days: 1, display: display), strings: strings);
+      expect(find.text('Dias ganhos'), findsOneWidget);
+      expect(find.text('1 dia'), findsOneWidget);
+      await pump(tester, details(days: 30, display: display), strings: strings);
+      expect(find.text('30 dias'), findsOneWidget);
     });
   });
 

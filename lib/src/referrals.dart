@@ -80,6 +80,23 @@ class AffiliateEnrolmentResult {
   }
 }
 
+/// Which earnings the program shows the referrer. Older servers don't send it:
+/// cash only.
+class ReferralEarnedDisplay {
+  /// Show the cash earned (`totalEarned`).
+  final bool cash;
+
+  /// Show the free-premium days earned (`rewardDaysEarned`).
+  final bool days;
+
+  const ReferralEarnedDisplay({this.cash = true, this.days = false});
+
+  factory ReferralEarnedDisplay.fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return const ReferralEarnedDisplay();
+    return ReferralEarnedDisplay(cash: json['cash'] == true, days: json['days'] == true);
+  }
+}
+
 /// The signed-in referrer's affiliate details and referral stats.
 ///
 /// Values come from the device, so use them for display. Grant anything of
@@ -102,6 +119,12 @@ class MyAffiliateDetails {
   final double totalUnpaid;
   final String currency;
   final String dashboardUrl;
+
+  /// Total free-premium days granted automatically. 0 from older servers.
+  final int rewardDaysEarned;
+
+  /// Which earnings to show: cash, days or both.
+  final ReferralEarnedDisplay earnedDisplay;
 
   /// How many referral rewards the referrer has been granted.
   final int rewardsGranted;
@@ -126,6 +149,8 @@ class MyAffiliateDetails {
     required this.totalUnpaid,
     required this.currency,
     required this.dashboardUrl,
+    this.rewardDaysEarned = 0,
+    this.earnedDisplay = const ReferralEarnedDisplay(),
     this.rewardsGranted = 0,
     this.premiumUntil,
     this.rewardCodes = const [],
@@ -146,6 +171,8 @@ class MyAffiliateDetails {
       totalUnpaid: _double(json['totalUnpaid']),
       currency: _string(json['currency'], fallback: 'USD'),
       dashboardUrl: _string(json['dashboardUrl']),
+      rewardDaysEarned: _int(json['rewardDaysEarned']),
+      earnedDisplay: ReferralEarnedDisplay.fromJson(json['earnedDisplay']),
       rewardsGranted: _int(json['rewardsGranted']),
       premiumUntil: _date(json['premiumUntil']),
       rewardCodes: json['rewardCodes'] is List
@@ -253,6 +280,9 @@ class ReferralProgramConfig {
   /// Hex colour such as `#6A0DAD`, or empty.
   final String primaryColor;
 
+  /// Whether the screen shows the referrer's short code. True from older servers.
+  final bool showCode;
+
   const ReferralProgramConfig({
     required this.enabled,
     required this.companyName,
@@ -260,6 +290,7 @@ class ReferralProgramConfig {
     required this.headline,
     required this.rewardText,
     required this.primaryColor,
+    this.showCode = true,
   });
 
   factory ReferralProgramConfig.fromJson(Map<String, dynamic> json) {
@@ -270,6 +301,7 @@ class ReferralProgramConfig {
       headline: _string(json['headline']),
       rewardText: _string(json['rewardText']),
       primaryColor: _string(json['primaryColor']),
+      showCode: json['showCode'] != false,
     );
   }
 }

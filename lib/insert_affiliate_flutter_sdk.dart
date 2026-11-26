@@ -23,6 +23,7 @@ export 'src/referrals.dart'
         AffiliateEnrolmentResult,
         MyAffiliateDetails,
         ReferralRewardCode,
+        ReferralEarnedDisplay,
         ReferralProgramConfig,
         buildReferralShareText,
         rewardCodesForPlatform;

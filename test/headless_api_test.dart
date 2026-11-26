@@ -47,6 +47,9 @@ void main() {
     expect(me?.totalUnpaid, isNull);
     expect(me?.currency, isNull);
     expect(me?.dashboardUrl, isNull);
+    expect(me?.rewardDaysEarned, isNull);
+    expect(me?.earnedDisplay.cash, isNull);
+    expect(me?.earnedDisplay.days, isNull);
     expect(me?.rewardsGranted, isNull);
     expect(me?.premiumUntil, isNull);
     expect(me?.rewardCodes, isNull);
@@ -56,6 +59,7 @@ void main() {
     expect(config?.headline, isNull);
     expect(config?.rewardText, isNull);
     expect(config?.primaryColor, isNull);
+    expect(config?.showCode, isNull);
   });
 
   test('a reward code says which store redeems it', () {

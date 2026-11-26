@@ -1,3 +1,8 @@
+## 1.12.0
+- Refer a friend screen: `ReferralProgramConfig.showCode` (true from older servers) hides the short code box when false; Copy then copies the link. The code still shows when there is no web link to share.
+- Refer a friend screen: `MyAffiliateDetails.rewardDaysEarned` and `earnedDisplay` (`cash`, `days`) decide the stats: Referrals, then Earned only when `cash`, then a new "Days earned" stat only when `days`. Older servers show cash only.
+- New `ReferralStrings` fields: `daysEarnedLabel`, `dayUnit` and `daysUnit` (`{count}` is filled in).
+
 ## 1.11.0
 - App Store Direct: `returnUserAccountTokenAndStoreExpectedTransaction(overrideUUID: ...)` lets an app that already sets its own `appAccountToken` keep using it. The value must be a valid UUID and is reused by later calls. Calls without it behave as before.
 
